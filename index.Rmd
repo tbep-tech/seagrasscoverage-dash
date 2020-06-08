@@ -1,0 +1,195 @@
+---
+title: "SEAGRASS COVERAGE DASHBOARD"
+output: 
+  flexdashboard::flex_dashboard:
+     logo: www/tarponlogo.png
+     social: menu
+     source_code: "https://github.com/tbep-tech/seagrass-dash"
+runtime: shiny
+css: styles.css
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+
+library(flexdashboard)
+library(tidyverse)
+library(mapedit)
+library(leaflet.extras)
+library(sf)
+library(mapview)
+library(reactable)
+library(shinydashboard)
+library(shinyWidgets)
+library(units)
+
+# # style file
+# styles <- readLines('https://raw.githubusercontent.com/tbep-tech/css-styling/master/styles.css')
+# writeLines(styles, 'styles.css')
+
+data(sgdat2010)
+data(sgdat2012)
+data(sgdat2014)
+data(sgdat2016)
+
+allsg <- list(
+    `2010` = sgdat2010, 
+    `2012` = sgdat2012, 
+    `2014` = sgdat2014, 
+    `2016` = sgdat2016
+  ) %>% 
+  enframe('yr', 'data') %>% 
+  mutate(
+    data = purrr::map(data, function(x){
+      
+      x <- x %>% 
+        mutate(
+          FLUCCS_CODE = factor(FLUCCS_CODE, levels = c('9113', '9116'), labels = c('patchy', 'continuous'))
+        ) %>% 
+        select(OBJECTID, Seagrass = FLUCCS_CODE)
+  
+      return(x) 
+      
+    })
+  )
+```
+
+```{r reactives}
+sgdat <- reactive({
+  
+  # input
+  yrsel <- input$yrsel
+
+  out <- allsg %>% 
+    filter(yr %in% yrsel) %>% 
+    pull(data) %>% 
+    .[[1]]
+
+  return(out)
+  
+})
+
+# overview map
+allmap <- reactive({
+  
+  # input
+  sgdat <- sgdat()
+  
+  out <- mapview(sgdat, homebutton = F, zcol = 'Seagrass', layer.name = 'Seagrass', col.regions = c('green', 'darkgreen'), color = 'darkgreen') %>% 
+    .@map
+
+  return(out)
+  
+})
+
+# reactive edits module for map selection
+edits <- reactive({
+  
+  # input
+  allmap <- allmap()
+  
+  # this modifies available options in map selection toolber
+  tomap <- allmap %>% 
+    addDrawToolbar(
+      polylineOptions = FALSE,
+      circleOptions = FALSE,
+      circleMarkerOptions = FALSE,
+      markerOptions = FALSE,
+      editOptions = editToolbarOptions()#,
+      # singleFeature = TRUE
+    )
+  
+  out <- callModule(editMod, 'editor', tomap)
+  
+  return(out)
+  
+})
+
+# selection from map as sf object, same crs as biodat
+mapsel <- reactive({
+
+  # input
+  edits <- edits()()
+  
+  # requires edits to continue
+  req(!is.null(edits$finished))
+
+  # get selection, calculate area
+  tocrp <- edits$finished 
+  
+  # crop and summarize by year
+  out <- allsg %>% 
+    mutate(
+      data = purrr::map(data, function(x){
+        
+        x <- st_intersection(tocrp, x) %>% 
+          mutate(
+            area = st_area(.)
+          ) %>% 
+          st_set_geometry(NULL) 
+        
+        return(x) 
+        
+      })
+    ) %>% 
+    unnest('data') %>% 
+    group_by(yr, Seagrass) %>% 
+    summarise(Acres = sum(area)) %>% 
+    ungroup %>% 
+    mutate(Acres = set_units(Acres, 'acres'))
+
+  req(nrow(out) > 0)
+
+  return(out)
+
+})
+
+# plot selection
+selplo <- reactive({
+  
+  # input
+  mapsel <- mapsel()
+
+  toplo <- mapsel %>% 
+    mutate(Acres = as.numeric(Acres))
+  
+  p <- ggplot(toplo, aes(x = factor(yr), y = Acres, fill = Seagrass)) + 
+    geom_bar(stat = 'identity') + 
+    scale_fill_manual(values = c('green', 'darkgreen')) +
+    theme_minimal() + 
+    theme(
+      axis.title.x = element_blank()
+    )
+  
+  return(p)
+  
+})
+
+```
+
+MAP SUMMARY
+===========================================================
+
+Column {data-width=250}
+-----------------------------------------------------------------------
+
+```{r}
+# selection editor
+editModUI('editor')
+```
+
+Column {.tabset .tabset-fade data-width=650}
+-----------------------------------------------------------------------
+
+### MAP SELECTION
+
+```{r}
+inputPanel(
+  selectInput('yrsel', 'Select year on map:', choices = c('2010', '2012', '2014', '2016'))
+)
+
+output$selplo <- renderPlot(selplo(), height = 300, width = 'auto')
+
+renderTable(mapsel())
+plotOutput('selplo')
+```

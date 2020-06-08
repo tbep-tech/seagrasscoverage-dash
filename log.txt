@@ -1,2 +1,2 @@
 6 of 7 
-Time difference of 14.4531 secs
+Time difference of 3.454907 secs

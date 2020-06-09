@@ -156,7 +156,6 @@ mapsel <- reactive({
     mutate(
       data = purrr::map(data, function(x){
 
-        x <- st_buffer(x, dist = 0)
         x <- st_intersection(tocrp, x) %>% 
           mutate(
             area = st_area(.)
@@ -177,6 +176,35 @@ mapsel <- reactive({
 
   return(out)
 
+})
+
+# table selection
+seltab <- reactive({
+  
+  # input
+  mapsel <- mapsel()
+  
+  totab <- mapsel %>% 
+    mutate(Acres = as.numeric(Acres)) %>% 
+    spread(Seagrass, Acres, fill = 0) %>% 
+    mutate(Total = continuous + patchy)
+  
+  out <- reactable(totab, 
+      columns = list(
+        yr = colDef(name = 'Year'), 
+        Total = colDef(name = 'Total (acres)')
+      ), 
+      defaultColDef = colDef(
+        footerStyle = list(fontWeight = "bold"),
+        format = colFormat(digits = 0, separators = TRUE),
+        resizable = TRUE
+      ),
+     filterable = T, 
+     defaultPageSize = 15
+    )
+  
+  return(out)
+  
 })
 
 # plot selection
@@ -250,6 +278,7 @@ plotlyOutput('selplo')
 ### TABULAR
 
 ```{r}
-renderTable(mapsel())
+output$seltab <- renderReactable(seltab())
+reactableOutput('seltab')
 ```
 

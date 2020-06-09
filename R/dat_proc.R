@@ -61,7 +61,8 @@ res <- foreach(i = 1:nrow(urls), .packages = c('tidyverse', 'sf')) %dopar% {
     st_transform(crs = prj) %>%
     .[segs, ] %>% 
     filter(FLUCCS_CODE %in% c(9113, 9116)) %>% 
-    select(OBJECTID, FLUCCS_CODE)
+    select(OBJECTID, FLUCCS_CODE) %>% 
+    st_buffer(dist = 0)
 
   # name assignment and save
   flnm <- paste0('sgdat', urls$name[i])

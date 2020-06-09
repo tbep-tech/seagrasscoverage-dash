@@ -1,2 +1,2 @@
 15 of 15 
-Time difference of 1.272888 mins
+Time difference of 35.79936 secs

@@ -35,16 +35,36 @@ if(Sys.info()[1] == 'Windows')
 
 fml <- "Lato Light"
 
+data(sgdat1988)
+data(sgdat1990)
+data(sgdat1992)
+data(sgdat1994)
+data(sgdat1996)
+data(sgdat1999)
+data(sgdat2001)
+data(sgdat2004)
+data(sgdat2006)
 data(sgdat2010)
 data(sgdat2012)
 data(sgdat2014)
 data(sgdat2016)
+data(sgdat2018)
 
 allsg <- list(
+    `1988` = sgdat1988,
+    `1990` = sgdat1990,
+    `1992` = sgdat1992,
+    `1994` = sgdat1994,
+    `1996` = sgdat1996, 
+    `1999` = sgdat1999, 
+    `2001` = sgdat2001, 
+    `2004` = sgdat2004,
+    `2006` = sgdat2006,
     `2010` = sgdat2010, 
     `2012` = sgdat2012, 
     `2014` = sgdat2014, 
-    `2016` = sgdat2016
+    `2016` = sgdat2016, 
+    `2018` = sgdat2018
   ) %>% 
   enframe('yr', 'data') %>% 
   mutate(
@@ -136,6 +156,7 @@ mapsel <- reactive({
     mutate(
       data = purrr::map(data, function(x){
 
+        x <- st_buffer(x, dist = 0)
         x <- st_intersection(tocrp, x) %>% 
           mutate(
             area = st_area(.)
@@ -215,7 +236,7 @@ Column {.tabset .tabset-fade}
 
 ```{r}
 inputPanel(
-  selectInput('yrsel', 'Select year on map:', choices = c('2010', '2012', '2014', '2016'))
+  selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')
 )
 ```
 

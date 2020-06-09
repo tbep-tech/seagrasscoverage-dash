@@ -22,10 +22,18 @@ library(reactable)
 library(shinydashboard)
 library(shinyWidgets)
 library(units)
+library(plotly)
+library(extrafont)
 
 # # style file
 # styles <- readLines('https://raw.githubusercontent.com/tbep-tech/css-styling/master/styles.css')
 # writeLines(styles, 'styles.css')
+
+loadfonts(device = 'pdf', quiet = T)
+if(Sys.info()[1] == 'Windows')
+  loadfonts(device = 'win', quiet = T)
+
+fml <- "Lato Light"
 
 data(sgdat2010)
 data(sgdat2012)
@@ -75,7 +83,8 @@ allmap <- reactive({
   # input
   sgdat <- sgdat()
   
-  out <- mapview(sgdat, homebutton = F, zcol = 'Seagrass', layer.name = 'Seagrass', col.regions = c('green', 'darkgreen'), color = 'darkgreen') %>% 
+  out <- mapview(sgdat, homebutton = F, zcol = 'Seagrass', layer.name = 'Seagrass', col.regions = c('green', 'darkgreen'), 
+                 color = 'darkgreen') %>% 
     .@map
 
   return(out)
@@ -111,17 +120,22 @@ mapsel <- reactive({
   # input
   edits <- edits()()
   
-  # requires edits to continue
-  req(!is.null(edits$finished))
+  # # requires edits to continue
+  # req(!is.null(edits$finished))
 
+  # requires edits to continue  
+  validate(
+    need(!is.null(edits$finished), 'Make a selection from the map using the draw features')
+  )
+  
   # get selection, calculate area
   tocrp <- edits$finished 
-  
+
   # crop and summarize by year
   out <- allsg %>% 
     mutate(
       data = purrr::map(data, function(x){
-        
+
         x <- st_intersection(tocrp, x) %>% 
           mutate(
             area = st_area(.)
@@ -151,15 +165,33 @@ selplo <- reactive({
   mapsel <- mapsel()
 
   toplo <- mapsel %>% 
-    mutate(Acres = as.numeric(Acres))
-  
-  p <- ggplot(toplo, aes(x = factor(yr), y = Acres, fill = Seagrass)) + 
-    geom_bar(stat = 'identity') + 
-    scale_fill_manual(values = c('green', 'darkgreen')) +
-    theme_minimal() + 
-    theme(
-      axis.title.x = element_blank()
+    mutate(
+      Acres = as.numeric(Acres)
     )
+  
+  cols <- c('darkgreen', 'green')
+  names(cols) <- c('continuous', 'patchy')
+  
+  p <- plot_ly(toplo, x = ~yr, y= ~Acres, color = ~Seagrass, text = ~paste0(yr, ', ', Seagrass, ', ', round(Acres, 0), ' acres'), 
+               hoverinfo = 'text',  colors = cols, alpha = 0.7) %>% 
+    add_bars() %>% 
+    layout(
+      yaxis = list(title = 'Acres', gridcolor = '#ECECEC'),
+      xaxis = list(title = ''),
+      legend = list(x = 0, y = 1.1),
+      barmode = 'stack',
+      showlegend = T, 
+      font = list(family = fml), 
+      plot_bgcolor = '#FFFFFF'
+    )
+  # 
+  # p <- ggplot(toplo, aes(x = factor(yr), y = Acres, fill = Seagrass)) + 
+  #   geom_bar(stat = 'identity') + 
+  #   scale_fill_manual(values = c('green', 'darkgreen')) +
+  #   theme_minimal() + 
+  #   theme(
+  #     axis.title.x = element_blank()
+  #   )
   
   return(p)
   
@@ -178,18 +210,25 @@ Column {data-width=250}
 editModUI('editor')
 ```
 
-Column {.tabset .tabset-fade data-width=650}
+Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
-
-### MAP SELECTION
 
 ```{r}
 inputPanel(
   selectInput('yrsel', 'Select year on map:', choices = c('2010', '2012', '2014', '2016'))
 )
-
-output$selplo <- renderPlot(selplo(), height = 300, width = 'auto')
-
-renderTable(mapsel())
-plotOutput('selplo')
 ```
+
+### PLOT
+
+```{r}
+output$selplo <- renderPlotly(selplo())
+plotlyOutput('selplo')
+```
+
+### TABULAR
+
+```{r}
+renderTable(mapsel())
+```
+

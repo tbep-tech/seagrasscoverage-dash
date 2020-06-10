@@ -5,6 +5,8 @@ output:
      logo: www/tarponlogo.png
      social: menu
      source_code: "https://github.com/tbep-tech/seagrass-dash"
+     includes:
+       in_header: cssloaders_in_header.html
 runtime: shiny
 css: styles.css
 ---
@@ -24,6 +26,7 @@ library(shinyWidgets)
 library(units)
 library(plotly)
 library(extrafont)
+library(shinycssloaders)
 
 # # style file
 # styles <- readLines('https://raw.githubusercontent.com/tbep-tech/css-styling/master/styles.css')
@@ -155,8 +158,6 @@ mapsel <- reactive({
   
   # get selection, calculate area
   tocrp <- edits$finished 
-
-  st_crs(tocrp) <- prj
   
   # crop and summarize by year
   out <- allsg %>% 
@@ -263,7 +264,7 @@ Column {data-width=250}
 
 ```{r}
 # selection editor
-editModUI('editor')
+editModUI('editor') %>% withSpinner()
 ```
 
 Column {.tabset .tabset-fade}

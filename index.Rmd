@@ -103,6 +103,8 @@ allmap <- reactive({
   # input
   sgdat <- sgdat()
   
+  st_crs(sgdat) <- 4326
+  
   out <- mapview(sgdat, homebutton = F, zcol = 'Seagrass', layer.name = 'Seagrass', col.regions = c('green', 'darkgreen'), 
                  color = 'darkgreen') %>% 
     .@map

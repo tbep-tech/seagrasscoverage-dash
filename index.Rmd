@@ -156,6 +156,8 @@ mapsel <- reactive({
   # get selection, calculate area
   tocrp <- edits$finished 
 
+  st_crs(tocrp) <- prj
+  
   # crop and summarize by year
   out <- allsg %>% 
     mutate(
@@ -268,8 +270,10 @@ Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
 ```{r}
-inputPanel(
-  selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')
+column(12, 
+  inputPanel(
+    selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')
+  )
 )
 ```
 

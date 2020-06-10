@@ -50,6 +50,8 @@ data(sgdat2014)
 data(sgdat2016)
 data(sgdat2018)
 
+prj <- 4326
+
 allsg <- list(
     `1988` = sgdat1988,
     `1990` = sgdat1990,
@@ -76,6 +78,9 @@ allsg <- list(
         ) %>% 
         select(OBJECTID, Seagrass = FLUCCS_CODE)
   
+        
+      st_crs(x) <- prj
+      
       return(x) 
       
     })
@@ -102,8 +107,6 @@ allmap <- reactive({
   
   # input
   sgdat <- sgdat()
-  
-  st_crs(sgdat) <- 4326
   
   out <- mapview(sgdat, homebutton = F, zcol = 'Seagrass', layer.name = 'Seagrass', col.regions = c('green', 'darkgreen'), 
                  color = 'darkgreen') %>% 

@@ -47,6 +47,7 @@ data(sgdat1999)
 data(sgdat2001)
 data(sgdat2004)
 data(sgdat2006)
+data(sgdat2008)
 data(sgdat2010)
 data(sgdat2012)
 data(sgdat2014)
@@ -65,6 +66,7 @@ allsg <- list(
     `2001` = sgdat2001, 
     `2004` = sgdat2004,
     `2006` = sgdat2006,
+    `2008` = sgdat2008,
     `2010` = sgdat2010, 
     `2012` = sgdat2012, 
     `2014` = sgdat2014, 

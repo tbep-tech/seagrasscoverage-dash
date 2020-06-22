@@ -79,7 +79,7 @@ allsg <- list(
       
       x <- x %>% 
         mutate(
-          FLUCCS_CODE = factor(FLUCCS_CODE, levels = c('9113', '9116'), labels = c('patchy', 'continuous'))
+          FLUCCS_CODE = factor(FLUCCS_CODE, levels = c('7210', '9113', '9116', '9121'), labels = c('sand', 'patchy', 'continuous', 'attached algae'))
         ) %>% 
         select(OBJECTID, Seagrass = FLUCCS_CODE)
   
@@ -113,7 +113,7 @@ allmap <- reactive({
   # input
   sgdat <- sgdat()
   
-  out <- mapview(sgdat, homebutton = F, zcol = 'Seagrass', layer.name = 'Seagrass', col.regions = c('green', 'darkgreen'), 
+  out <- mapview(sgdat, homebutton = F, zcol = 'Seagrass', layer.name = 'Seagrass', col.regions = c('tan', 'green', 'darkgreen', 'grey'), 
                  color = 'darkgreen') %>% 
     .@map
 
@@ -228,8 +228,8 @@ selplo <- reactive({
       Acres = as.numeric(Acres)
     )
   
-  cols <- c('darkgreen', 'green')
-  names(cols) <- c('continuous', 'patchy')
+  cols <- c('tan', 'darkgreen', 'green', 'grey')
+  names(cols) <- c('sand', 'continuous', 'patchy', 'attached algae')
   
   p <- plot_ly(toplo, x = ~yr, y= ~Acres, color = ~Seagrass, text = ~paste0(yr, ', ', Seagrass, ', ', round(Acres, 0), ' acres'), 
                hoverinfo = 'text',  colors = cols, alpha = 0.7) %>% 

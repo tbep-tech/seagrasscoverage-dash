@@ -160,6 +160,15 @@ mapsel <- reactive({
   
   # get selection, calculate area
   tocrp <- edits$finished 
+
+  # check area of selection and validate
+  chkarea <- st_area(tocrp) %>% 
+    set_units('acres') %>% 
+    as.numeric
+  
+  validate(
+    need(chkarea > 1, 'Selected less than 1 acre, please select a larger area')
+  )
   
   # crop and summarize by year
   out <- allsg %>% 

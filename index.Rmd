@@ -38,6 +38,11 @@ if(Sys.info()[1] == 'Windows')
 
 fml <- "Lato Light"
 
+flcat <- list(
+  code = c('7210', '9113', '9116', '9121'),
+  name = c('sand', 'patchy', 'continuous', 'attached algae')
+)
+
 data(sgdat1988)
 data(sgdat1990)
 data(sgdat1992)
@@ -79,9 +84,9 @@ allsg <- list(
       
       x <- x %>% 
         mutate(
-          FLUCCS_CODE = factor(FLUCCS_CODE, levels = c('7210', '9113', '9116', '9121'), labels = c('sand', 'patchy', 'continuous', 'attached algae'))
+          FLUCCS_CODE = factor(FLUCCS_CODE, levels = flcat$code, labels = flcat$name)
         ) %>% 
-        select(OBJECTID, Seagrass = FLUCCS_CODE)
+        select(OBJECTID, Category = FLUCCS_CODE)
   
         
       st_crs(x) <- prj
@@ -93,16 +98,43 @@ allsg <- list(
 ```
 
 ```{r reactives}
+# filter all seagrass data by fluccs code
+fltallsg <- reactive({
+  
+  # input  
+  flsel <- input$flsel
+
+  out <- allsg %>% 
+    mutate(
+      data = purrr::map(data, function(x){
+        
+        x %>% 
+          filter(Category %in% flsel) %>% 
+          mutate(Category = fct_drop(Category))
+        
+      })
+    )
+
+  return(out)
+  
+})
+
+# year to plot
 sgdat <- reactive({
   
   # input
   yrsel <- input$yrsel
-
-  out <- allsg %>% 
+  fltallsg <- fltallsg()
+  
+  out <- fltallsg %>% 
     filter(yr %in% yrsel) %>% 
     pull(data) %>% 
     .[[1]]
 
+  validate(
+    need(nrow(out) > 0, 'No selection')
+  )
+  
   return(out)
   
 })
@@ -113,8 +145,12 @@ allmap <- reactive({
   # input
   sgdat <- sgdat()
   
-  out <- mapview(sgdat, homebutton = F, zcol = 'Seagrass', layer.name = 'Seagrass', col.regions = c('tan', 'green', 'darkgreen', 'grey'), 
-                 color = 'darkgreen') %>% 
+  # fix colors based on selection
+  colreg <- c('tan', 'green', 'darkgreen', 'dodgerblue')
+  names(colreg) <- c('sand', 'patchy', 'continuous', 'attached algae')
+  colreg <- colreg[levels(sgdat$Category)]
+  
+  out <- mapview(sgdat, homebutton = F, zcol = 'Category', layer.name = 'Category', col.regions = colreg, color = 'grey', lwd = 0) %>% 
     .@map
 
   return(out)
@@ -148,6 +184,7 @@ edits <- reactive({
 mapsel <- reactive({
 
   # input
+  fltallsg <- fltallsg()
   edits <- edits()()
   
   # # requires edits to continue
@@ -171,7 +208,7 @@ mapsel <- reactive({
   )
   
   # crop and summarize by year
-  out <- allsg %>% 
+  out <- fltallsg %>% 
     mutate(
       data = purrr::map(data, function(x){
 
@@ -186,13 +223,13 @@ mapsel <- reactive({
       })
     ) %>% 
     unnest('data') %>% 
-    group_by(yr, Seagrass) %>% 
+    group_by(yr, Category) %>% 
     summarise(Acres = sum(area)) %>% 
     ungroup %>% 
     mutate(Acres = set_units(Acres, 'acres'))
 
   req(nrow(out) > 0)
-
+  
   return(out)
 
 })
@@ -205,7 +242,7 @@ seltab <- reactive({
   
   totab <- mapsel %>% 
     mutate(Acres = as.numeric(Acres)) %>% 
-    spread(Seagrass, Acres, fill = 0) %>% 
+    spread(Category, Acres, fill = 0) %>% 
     mutate(Total = continuous + patchy)
   
   out <- reactable(totab, 
@@ -237,10 +274,10 @@ selplo <- reactive({
       Acres = as.numeric(Acres)
     )
   
-  cols <- c('tan', 'darkgreen', 'green', 'grey')
+  cols <- c('tan', 'darkgreen', 'green', 'dodgerblue')
   names(cols) <- c('sand', 'continuous', 'patchy', 'attached algae')
   
-  p <- plot_ly(toplo, x = ~yr, y= ~Acres, color = ~Seagrass, text = ~paste0(yr, ', ', Seagrass, ', ', round(Acres, 0), ' acres'), 
+  p <- plot_ly(toplo, x = ~yr, y= ~Acres, color = ~Category, text = ~paste0(yr, ', ', Category, ', ', round(Acres, 0), ' acres'), 
                hoverinfo = 'text',  colors = cols, alpha = 0.7) %>% 
     add_bars() %>% 
     layout(
@@ -253,7 +290,7 @@ selplo <- reactive({
       plot_bgcolor = '#FFFFFF'
     )
   # 
-  # p <- ggplot(toplo, aes(x = factor(yr), y = Acres, fill = Seagrass)) + 
+  # p <- ggplot(toplo, aes(x = factor(yr), y = Acres, fill = Category)) + 
   #   geom_bar(stat = 'identity') + 
   #   scale_fill_manual(values = c('green', 'darkgreen')) +
   #   theme_minimal() + 
@@ -284,9 +321,11 @@ Column {.tabset .tabset-fade}
 ```{r}
 column(12, 
   inputPanel(
-    selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')
-  )
-)
+    selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018'),
+    pickerInput('flsel', 'Select categories:', choices = flcat$name, 
+                          selected = flcat$name, multiple = T,
+                          options = list("style-base" = "form-control", style = "", `actions-box` = TRUE))
+))
 ```
 
 ### PLOT

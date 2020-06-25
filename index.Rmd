@@ -95,6 +95,12 @@ allsg <- list(
       
     })
   )
+
+downloadButtonRmd <- function (outputId, label = "Download", class = NULL, ...)  {
+  tags$a(id = outputId, class = paste("btn btn-default shiny-download-link", 
+                                      class), href = "", target = "_blank", download = NA, 
+         icon("download"), label, ...)
+}
 ```
 
 ```{r reactives}
@@ -234,31 +240,41 @@ mapsel <- reactive({
 
 })
 
-# table selection
+# table selection for download and reactable
 seltab <- reactive({
   
   # input
   mapsel <- mapsel()
   
-  totab <- mapsel %>% 
+  out <- mapsel %>% 
     mutate(Acres = as.numeric(Acres)) %>% 
     spread(Category, Acres, fill = 0) %>% 
     mutate(Total = continuous + patchy)
   
-  out <- reactable(totab, 
-      columns = list(
-        yr = colDef(name = 'Year'), 
-        Total = colDef(name = 'Total (acres)')
-      ), 
-      defaultColDef = colDef(
-        footerStyle = list(fontWeight = "bold"),
-        format = colFormat(digits = 0, separators = TRUE),
-        resizable = TRUE
-      ),
-     filterable = T, 
-     defaultPageSize = 15
-    )
+  return(out)
   
+})
+
+# formatted selection table as reactable
+frmtab <- reactive({
+  
+  # input
+  seltab <- seltab()
+  
+  out <- reactable(seltab, 
+    columns = list(
+      yr = colDef(name = 'Year'), 
+      Total = colDef(name = 'Total (acres)')
+    ), 
+    defaultColDef = colDef(
+      footerStyle = list(fontWeight = "bold"),
+      format = colFormat(digits = 0, separators = TRUE),
+      resizable = TRUE
+    ),
+   filterable = T, 
+   defaultPageSize = 15
+  )
+
   return(out)
   
 })
@@ -301,7 +317,21 @@ selplo <- reactive({
   return(p)
   
 })
+```
 
+```{r downloadhandlers}
+# selected data
+output$seldl <- downloadHandler(
+  filename = function(){'seagrass_selection.csv'},
+  content = function(file){
+    
+    # inputs
+    seltab <- seltab()
+    
+    write.csv(seltab, file, quote = T, row.names = F)
+    
+  }
+)
 ```
 
 MAP SUMMARY
@@ -319,13 +349,17 @@ Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
 ```{r}
-column(12, 
-  inputPanel(
-    selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018'),
-    pickerInput('flsel', 'Select categories:', choices = flcat$name, 
-                          selected = flcat$name, multiple = T,
-                          options = list("style-base" = "form-control", style = "", `actions-box` = TRUE))
-))
+column(12,
+  br(),
+  wellPanel(style = "overflow-y:scroll; max-height: 200px; background-color:#F2F2F2",
+  column(6,
+    selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')
+    ),
+  column(6,
+    selectInput('flsel', 'Select categories:', choices = flcat$name, selected = flcat$name, multiple = T)
+    ),
+  )
+)
 ```
 
 ### PLOT
@@ -338,7 +372,13 @@ plotlyOutput('selplo')
 ### TABULAR
 
 ```{r}
-output$seltab <- renderReactable(seltab())
-reactableOutput('seltab')
+output$frmtab <- renderReactable(frmtab())
+fillCol(flex = c(NA, 1), 
+  renderUI({
+    req(!is.null(edits()()$finished))
+    downloadBttn('seldl', 'Download data', style = 'simple', block = T, color = 'success')
+  }),
+  reactableOutput('frmtab')
+)
 ```
 

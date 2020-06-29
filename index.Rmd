@@ -29,6 +29,8 @@ library(extrafont)
 library(shinycssloaders)
 library(networkD3)
 
+source('R/funcs.R')
+
 # # style file
 # styles <- readLines('https://raw.githubusercontent.com/tbep-tech/css-styling/master/styles.css')
 # writeLines(styles, 'styles.css')
@@ -186,14 +188,11 @@ edits <- reactive({
 })
 
 # selection from map as sf object, same crs as biodat
-mapsel <- reactive({
+crpsel <- reactive({
 
   # input
   fltallsg <- fltallsg()
   edits <- edits()()
-
-  # # requires edits to continue
-  # req(!is.null(edits$finished))
 
   # requires edits to continue
   validate(
@@ -206,10 +205,11 @@ mapsel <- reactive({
   # check area of selection and validate
   chkarea <- st_area(tocrp) %>%
     set_units('acres') %>%
-    as.numeric
+    as.numeric %>% 
+    round(2)
 
   validate(
-    need(chkarea > 1, 'Selected less than 1 acre, please select a larger area')
+    need(chkarea > 1, paste0('Selected size is ', chkarea, ' acres and must be greater than 1 acre, please select a larger area'))
   )
 
   # crop and summarize by year
@@ -220,13 +220,28 @@ mapsel <- reactive({
         x <- st_intersection(tocrp, x) %>%
           mutate(
             area = st_area(.)
-          ) %>%
-          st_set_geometry(NULL)
+          ) 
 
         return(x)
 
       })
-    ) %>%
+    )
+
+  return(out)
+
+})
+
+# selection from map as sf object, same crs as biodat
+mapsel <- reactive({
+
+  # input
+  crpsel <- crpsel()
+
+  # crop and summarize by year
+  out <- crpsel %>% 
+    mutate(
+      data = purrr::map(data, function(x) st_set_geometry(x, NULL))
+    ) %>% 
     unnest('data') %>%
     group_by(yr, Category) %>%
     summarise(Acres = sum(area)) %>%
@@ -237,6 +252,41 @@ mapsel <- reactive({
 
   return(out)
 
+})
+
+# change estimates from map selection 
+chgmapsel <- reactive({
+  
+  # input
+  crpsel <- crpsel()
+  edits <- edits()()
+
+  # requires edits to continue
+  validate(
+    need(!is.null(edits$finished), 'Make a selection from the map using the draw features')
+  )
+
+  # get selection, calculate area
+  tocrp <- edits$finished
+
+  # check area of selection and validate
+  chkarea <- st_area(tocrp) %>%
+    set_units('acres') %>%
+    as.numeric %>% 
+    round(2)
+
+  validate(
+    need(chkarea < 20000, paste0('Selected size is ', chkarea, ' acres and must be less than 20,000 acres, please select a smaller area'))
+  )
+  
+  validate(
+    need(chkarea > 1, paste0('Selected size is ', chkarea, ' acres and must be greater than 1 acre, please select a larger area'))
+  )
+
+  out <- chgfun(crpsel)
+  
+  return(out)
+  
 })
 
 # table selection for download and reactable
@@ -314,13 +364,26 @@ selplo <- reactive({
 
 })
 
+# change plot selection
+chgselplo <- reactive({
+  
+  # inputs
+  chgmapsel <- chgmapsel()
+  nodpd1 <- input$nodpd1
+  
+  out <- sanplofun(chgmapsel, nodpd1)
+  
+  return(out)
+  
+})
+
 # sankey flow chart by segment
 snksegplo <- reactive({
   
   # input
   snkseg <- input$snkseg
   flsel2 <- input$flsel2
-  nodepd <- input$nodepd
+  nodpd2 <- input$nodpd2
   
   req(!is.null(flsel2))
   
@@ -334,27 +397,8 @@ snksegplo <- reactive({
     filter(bay_segment %in% !!snkseg) %>% 
     filter(grepl(fltval, source)) %>% 
     filter(grepl(fltval, target))
-    
-  nodes <- data.frame(name = c(as.character(toplo$source), as.character(toplo$target))) %>% 
-    unique() %>% 
-    mutate(
-      group = gsub('\\,\\s[0-9]+$', '', name), 
-      group = factor(group, levels = c("algae", "cont.", "patchy", "other", "sand"))
-    )
-
-  # cols <- c('brown', 'darkgreen', 'dodgerblue', 'green', 'tan')
-  cols <- c("#A52A2A", "#006400", "#1E90FF", "#00FF00", "#D2B48C")
-  names(cols) <- c("algae", "cont.", "other", "patchy", "sand")
-
-  cols <- 'd3.scaleOrdinal() .domain(["algae", "cont.", "patchy", "other", "sand"]) .range(["#A52A2A", "#006400", "#00FF00", "#1E90FF", "#D2B48C"])'
   
-  toplo$IDsource=match(toplo$source, nodes$name)-1 
-  toplo$IDtarget=match(toplo$target, nodes$name)-1
-  
-  out <- sankeyNetwork(Links = toplo[, -c(1, 2)], Nodes = nodes, NodeGroup = "group", colourScale = cols,
-                       Source = "IDsource", Target = "IDtarget",
-                       Value = "value", NodeID = "name", 
-                       sinksRight=F, units = 'acres', nodeWidth = 20, fontSize = 12, nodePadding = nodepd, iterations = 3)
+  out <- sanplofun(toplo, nodpd2)  
   
   return(out)
   
@@ -393,18 +437,19 @@ Column {.tabset .tabset-fade}
 ```{r}
 column(12,
   br(),
-  wellPanel(style = "overflow-y:scroll; max-height: 200px; background-color:#F2F2F2",
-  column(6,
+  # wellPanel(style = "overflow-y:scroll; max-height: 200px; background-color:#F2F2F2",
+  column(4,
     selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')
     ),
-  column(6,
+  column(4,
     selectInput('flsel', 'Select categories:', choices = flcat$name, selected = flcat$name, multiple = T)
     ),
-  )
+  column(4, numericInput('nodpd1', 'Change spacing:', min = 0, max = 300, step = 10, value = 100))
+  # )
 )
 ```
 
-### PLOT
+### BARPLOT
 
 ```{r}
 output$selplo <- renderPlotly(selplo())
@@ -424,6 +469,13 @@ fillCol(flex = c(NA, 1),
 )
 ```
 
+### CHANGE PLOT
+
+```{r}
+output$chgselplo <- renderSankeyNetwork(chgselplo())
+sankeyNetworkOutput('chgselplo')
+```
+
 CHANGE BY SEGMENT
 ===========================================================
 
@@ -438,7 +490,7 @@ fillCol(flex = c(NA, 1),
   column(12, 
     column(4, selectInput('snkseg', 'Choose bay segment:', choices = list('Old Tampa Bay' = 'OTB', 'Hillsborough Bay' = 'HB', 'Middle Tampa Bay' = 'MTB', 'Lower Tampa Bay' = 'LTB'))), 
     column(4, selectInput('flsel2', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)), 
-    column(4, numericInput('nodepd', 'Change spacing:', min = 0, max = 300, step = 10, value = 100))
+    column(4, numericInput('nodpd2', 'Change spacing:', min = 0, max = 300, step = 10, value = 100))
     ),
   sankeyNetworkOutput('snksegplo')
 )

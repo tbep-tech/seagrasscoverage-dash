@@ -148,16 +148,24 @@ sgdat <- reactive({
 
 })
 
-# overview map
+# overview map, shows only simplified polygons
 allmap <- reactive({
 
   # input
-  sgdat <- sgdat()
+  yrsel <- input$yrsel
+  flsel <- input$flsel
+  
+  flnm <- paste0('sgdat', yrsel, 'simp')
+  load(file = paste0('data/', flnm, '.RData'))
+  
+  tomap <- get(flnm) %>%
+          filter(Category %in% flsel) %>%
+          mutate(Category = fct_drop(Category))
 
   # fix colors based on selection
-  colreg <- cols[levels(sgdat$Category)]
+  colreg <- cols[levels(tomap$Category)]
 
-  out <- mapview(sgdat, homebutton = F, zcol = 'Category', layer.name = 'Category', col.regions = colreg, color = 'grey', lwd = 0) %>%
+  out <- mapview(tomap, homebutton = F, zcol = 'Category', layer.name = 'Category', col.regions = colreg, color = 'grey', lwd = 0) %>%
     .@map
 
   return(out)
@@ -377,13 +385,11 @@ chgselplo <- reactive({
   
 })
 
-# sankey flow chart by segment
-snksegplo <- reactive({
-  
-  # input
+# fluccs change data by segment
+chgseg <- reactive({
+
   snkseg <- input$snkseg
   flsel2 <- input$flsel2
-  nodpd2 <- input$nodpd2
   
   req(!is.null(flsel2))
   
@@ -393,12 +399,72 @@ snksegplo <- reactive({
     paste(., collapse = '|')
   
   # filter by segment and fluccs
-  toplo <- chgdat %>%
+  out <- chgdat %>%
     filter(bay_segment %in% !!snkseg) %>% 
     filter(grepl(fltval, source)) %>% 
-    filter(grepl(fltval, target))
+    filter(grepl(fltval, target))  
   
-  out <- sanplofun(toplo, nodpd2)  
+  return(out)
+  
+})
+
+# fluccs change table by segment
+chgsegtab <- reactive({
+  
+  # input
+  chgseg <- chgseg()
+  
+  out <- chgseg %>% 
+    select(-bay_segment) %>% 
+    mutate(
+      source_yr = as.numeric(gsub('^.*\\,\\s([0-9]+)$', '\\1', source)),
+      target_yr = as.numeric(gsub('^.*\\,\\s([0-9]+)$', '\\1', target)), 
+      source = gsub('\\,\\s[0-9]+$', '', source), 
+      target = gsub('\\,\\s[0-9]+$', '', target)
+    ) %>% 
+    spread(target, value, fill = 0) %>% 
+    rename(
+      Category = source, 
+      `Start year` = source_yr, 
+      `End year` = target_yr
+    )
+  
+  return(out)
+  
+})
+
+# fluccs change table by segment, reactable
+chgsegrcttab <- reactive({
+  
+  # input
+  chgsegtab <- chgsegtab()
+  
+  out <- reactable(chgsegtab,
+    columns = list(
+      `Start year` = colDef(format = colFormat(separators = F)),
+      `End year` = colDef(format = colFormat(separators = F))
+    ),
+    defaultColDef = colDef(
+      footerStyle = list(fontWeight = "bold"),
+      format = colFormat(digits = 0, separators = TRUE),
+      resizable = TRUE
+    ),
+   filterable = T,
+   defaultPageSize = 15
+  )
+  
+  return(out)
+  
+})
+
+# sankey flow chart by segment
+chgsegplo <- reactive({
+  
+  # input
+  chgseg <- chgseg()
+  nodpd2 <- input$nodpd2
+  
+  out <- sanplofun(chgseg, nodpd2)  
   
   return(out)
   
@@ -415,6 +481,19 @@ output$seldl <- downloadHandler(
     seltab <- seltab()
     
     write.csv(seltab, file, quote = T, row.names = F)
+    
+  }
+)
+
+# selected segment data
+output$selsegdl <- downloadHandler(
+  filename = function(){'segment_selection.csv'},
+  content = function(file){
+    
+    # inputs
+    chgsegtab <- chgsegtab()
+    
+    write.csv(chgsegtab, file, quote = T, row.names = F)
     
   }
 )
@@ -479,20 +558,39 @@ sankeyNetworkOutput('chgselplo')
 CHANGE BY SEGMENT
 ===========================================================
 
-Column
+Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
-###
+### ALL YEARS
 
 ```{r}
-output$snksegplo <- renderSankeyNetwork(snksegplo())
+output$chgsegplo <- renderSankeyNetwork(chgsegplo())
+output$chgsegrcttab <- renderReactable(chgsegrcttab())
 fillCol(flex = c(NA, 1),
   column(12, 
-    column(4, selectInput('snkseg', 'Choose bay segment:', choices = list('Old Tampa Bay' = 'OTB', 'Hillsborough Bay' = 'HB', 'Middle Tampa Bay' = 'MTB', 'Lower Tampa Bay' = 'LTB'))), 
-    column(4, selectInput('flsel2', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)), 
-    column(4, numericInput('nodpd2', 'Change spacing:', min = 0, max = 300, step = 10, value = 100))
+    column(3, selectInput('snkseg', 'Choose bay segment:', choices = list('Old Tampa Bay' = 'OTB', 'Hillsborough Bay' = 'HB', 'Middle Tampa Bay' = 'MTB', 'Lower Tampa Bay' = 'LTB'))), 
+    column(3, selectInput('segres', 'Choose summary output:', choices = c('plot', 'table'))),
+    column(3, selectInput('flsel2', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)), 
+    column(3, numericInput('nodpd2', 'Change spacing (plot only):', min = 0, max = 300, step = 10, value = 100))
     ),
-  sankeyNetworkOutput('snksegplo')
+  renderUI({
+    
+    # input
+    segres <- input$segres
+    
+    if(segres == 'plot')
+      return(sankeyNetworkOutput('chgsegplo'))
+    
+    if(segres == 'table'){
+      out <- fillCol(flex = c(NA, 1),
+        downloadBttn('selsegdl', 'Download data', style = 'simple', block = T, color = 'success'),
+        reactableOutput('chgsegrcttab')
+      )
+      return(out)
+    }
+    
+  })
 )
 ```
 
+### YEAR VS YEAR

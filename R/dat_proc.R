@@ -213,3 +213,71 @@ for(i in 1:nrow(inds)){
 }
 
 save(chgdat, file = 'data/chgdat.RData', compress = 'xz')
+
+# simplify polygons for mapping -------------------------------------------
+
+# load all data
+data(sgdat1988)
+data(sgdat1990)
+data(sgdat1992)
+data(sgdat1994)
+data(sgdat1996)
+data(sgdat1999)
+data(sgdat2001)
+data(sgdat2004)
+data(sgdat2006)
+data(sgdat2008)
+data(sgdat2010)
+data(sgdat2012)
+data(sgdat2014)
+data(sgdat2016)
+data(sgdat2018)
+
+prj <- 4326
+
+flcat <- list(
+  code = c('7210', '9113', '9116', '9121'),
+  name = c('sand', 'patchy', 'cont.', 'algae')
+)
+
+list(
+  `1988` = sgdat1988,
+  `1990` = sgdat1990,
+  `1992` = sgdat1992,
+  `1994` = sgdat1994,
+  `1996` = sgdat1996,
+  `1999` = sgdat1999,
+  `2001` = sgdat2001,
+  `2004` = sgdat2004,
+  `2006` = sgdat2006,
+  `2008` = sgdat2008,
+  `2010` = sgdat2010,
+  `2012` = sgdat2012,
+  `2014` = sgdat2014,
+  `2016` = sgdat2016,
+  `2018` = sgdat2018
+  ) %>%
+  enframe('yr', 'data') %>%
+  mutate(
+    data = purrr::pmap(list(yr, data), function(yr, data){
+      
+      x <- data %>%
+        mutate(
+          FLUCCS_CODE = factor(FLUCCS_CODE, levels = flcat$code, labels = flcat$name)
+        ) %>%
+        select(OBJECTID, Category = FLUCCS_CODE)
+      
+      st_crs(x) <- prj
+      
+      x <- st_simplify(x, dTolerance = 0.0001)
+      
+      # name assignment and save
+      flnm <- paste0('sgdat', yr, 'simp')
+      assign(flnm, x)
+      save(list = flnm, file = paste0('data/', flnm, '.RData'), compress = 'xz')
+      
+      return(x)
+      
+    })
+  )
+

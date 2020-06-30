@@ -28,6 +28,7 @@ library(plotly)
 library(extrafont)
 library(shinycssloaders)
 library(networkD3)
+library(tbeptools)
 
 source('R/funcs.R')
 
@@ -47,6 +48,7 @@ flcat <- list(
 )
 
 data(chgdat)
+data(bardat)
 
 data(sgdat1988)
 data(sgdat1990)
@@ -111,14 +113,14 @@ names(cols) <- c('sand', 'cont.', 'patchy', 'algae')
 fltallsg <- reactive({
 
   # input
-  flsel <- input$flsel
+  flsel1 <- input$flsel1
 
   out <- allsg %>%
     mutate(
       data = purrr::map(data, function(x){
 
         x %>%
-          filter(Category %in% flsel) %>%
+          filter(Category %in% flsel1) %>%
           mutate(Category = fct_drop(Category))
 
       })
@@ -132,11 +134,11 @@ fltallsg <- reactive({
 sgdat <- reactive({
 
   # input
-  yrsel <- input$yrsel
+  yrsel1 <- input$yrsel1
   fltallsg <- fltallsg()
 
   out <- fltallsg %>%
-    filter(yr %in% yrsel) %>%
+    filter(yr %in% yrsel1) %>%
     pull(data) %>%
     .[[1]]
 
@@ -149,17 +151,17 @@ sgdat <- reactive({
 })
 
 # overview map, shows only simplified polygons
-allmap <- reactive({
+allmap1 <- reactive({
 
   # input
-  yrsel <- input$yrsel
-  flsel <- input$flsel
+  yrsel1 <- input$yrsel1
+  flsel1 <- input$flsel1
   
-  flnm <- paste0('sgdat', yrsel, 'simp')
+  flnm <- paste0('sgdat', yrsel1, 'simp')
   load(file = paste0('data/', flnm, '.RData'))
   
   tomap <- get(flnm) %>%
-          filter(Category %in% flsel) %>%
+          filter(Category %in% flsel1) %>%
           mutate(Category = fct_drop(Category))
 
   # fix colors based on selection
@@ -176,10 +178,10 @@ allmap <- reactive({
 edits <- reactive({
 
   # input
-  allmap <- allmap()
+  allmap1 <- allmap1()
 
   # this modifies available options in map selection toolber
-  tomap <- allmap %>%
+  tomap <- allmap1 %>%
     addDrawToolbar(
       polylineOptions = FALSE,
       circleOptions = FALSE,
@@ -267,7 +269,7 @@ chgmapsel <- reactive({
   
   # input
   crpsel <- crpsel()
-  flsel <- input$flsel
+  flsel1 <- input$flsel1
   edits <- edits()()
 
   # requires edits to continue
@@ -276,7 +278,7 @@ chgmapsel <- reactive({
   )
   
   # regex for filter
-  fltval <- paste0('^', flsel) %>% 
+  fltval <- paste0('^', flsel1) %>% 
     gsub('\\.', '\\\\.', .) %>% 
     paste(., collapse = '|')
 
@@ -314,37 +316,25 @@ seltab <- reactive({
   out <- mapsel %>%
     mutate(Acres = as.numeric(Acres)) %>%
     spread(Category, Acres, fill = 0) %>%
-    mutate(Total = `cont.` + patchy)
+    mutate(Total = rowSums(select(., -yr)))
 
   return(out)
 
 })
 
 # formatted selection table as reactable
-frmtab <- reactive({
+frmseltab <- reactive({
 
   # input
   seltab <- seltab()
 
-  out <- reactable(seltab,
-    columns = list(
-      yr = colDef(name = 'Year'),
-      Total = colDef(name = 'Total (acres)')
-    ),
-    defaultColDef = colDef(
-      footerStyle = list(fontWeight = "bold"),
-      format = colFormat(digits = 0, separators = TRUE),
-      resizable = TRUE
-    ),
-   filterable = T,
-   defaultPageSize = 12
-  )
-
+  out <- bartabfun(seltab)
+  
   return(out)
 
 })
 
-# plot selection
+# selection barplot
 selplo <- reactive({
 
   # input
@@ -355,26 +345,7 @@ selplo <- reactive({
       Acres = as.numeric(Acres)
     )
 
-  p <- plot_ly(toplo, x = ~yr, y= ~Acres, color = ~Category, text = ~paste0(yr, ', ', Category, ', ', round(Acres, 0), ' acres'),
-               hoverinfo = 'text',  colors = cols, alpha = 0.7) %>%
-    add_bars() %>%
-    layout(
-      yaxis = list(title = 'Acres', gridcolor = '#ECECEC'),
-      xaxis = list(title = ''),
-      legend = list(x = 0, y = 1.1),
-      barmode = 'stack',
-      showlegend = T,
-      font = list(family = fml),
-      plot_bgcolor = '#FFFFFF'
-    )
-  #
-  # p <- ggplot(toplo, aes(x = factor(yr), y = Acres, fill = Category)) +
-  #   geom_bar(stat = 'identity') +
-  #   scale_fill_manual(values = c('green', 'darkgreen')) +
-  #   theme_minimal() +
-  #   theme(
-  #     axis.title.x = element_blank()
-  #   )
+  p <- barplofun(toplo, cols, fml)
 
   return(p)
 
@@ -439,6 +410,100 @@ chgselrcttab <- reactive({
   
   return(out)
   
+})
+
+# overview segment map, shows only simplified polygons
+allmap2 <- reactive({
+
+  # input
+  yrsel2 <- input$yrsel2
+  flsel2 <- input$flsel2
+  snkseg <- input$snkseg
+  
+  flnm <- paste0('sgdat', yrsel2, 'simp')
+  load(file = paste0('data/', flnm, '.RData'))
+  
+  tomap <- get(flnm) %>%
+          filter(Category %in% flsel2) %>%
+          mutate(Category = fct_drop(Category))
+
+  segmap <- tbseg %>% 
+    filter(bay_segment %in% !!snkseg)
+  
+  # fix colors based on selection
+  colreg <- cols[levels(tomap$Category)]
+
+  mapout <- mapview(tomap, homebutton = F, zcol = 'Category', layer.name = 'Category', col.regions = colreg, lwd = 0) +
+     mapview(segmap, homebutton = F, legend = F, col.regions = 'grey95', lwd = 3, zcol = 'long_name', alpha.regions = 0.5) 
+  
+  out <- mapout@map
+
+  return(out)
+
+})
+
+# segment selection data
+segsel <- reactive({
+  
+  # input
+  snkseg <- input$snkseg
+  flsel2 <- input$flsel2
+  
+  # regex for filter
+  fltval <- paste0('^', flsel2) %>% 
+    gsub('\\.', '\\\\.', .) %>% 
+    paste(., collapse = '|')
+  
+  out <- bardat %>%
+    filter(bay_segment %in% !!snkseg) %>% 
+    filter(grepl(fltval, Category))
+  
+  return(out)
+  
+})
+
+# table selection for download and reactable
+segtab <- reactive({
+
+  # input
+  segsel <- segsel()
+
+  out <- segsel %>%
+    mutate(Acres = as.numeric(Acres)) %>%
+    spread(Category, Acres, fill = 0) %>%
+    mutate(Total = rowSums(select(., -yr)))
+
+  return(out)
+
+})
+
+# formatted segment table as reactable
+frmsegtab <- reactive({
+
+  # input
+  segtab <- segtab()
+
+  out <- bartabfun(segtab)
+
+  return(out)
+
+})
+
+# segment barplot 
+segplo <- reactive({
+
+  # input
+  segsel <- segsel()
+
+  toplo <- segsel %>%
+    mutate(
+      Acres = as.numeric(Acres)
+    )
+
+  p <- barplofun(toplo, cols, fml)
+
+  return(p)
+
 })
 
 # fluccs change data by segment
@@ -529,8 +594,8 @@ chgsegplo <- reactive({
 
 ```{r downloadhandlers}
 # selected data
-output$seldl <- downloadHandler(
-  filename = function(){'seagrass_selection.csv'},
+output$seldl1 <- downloadHandler(
+  filename = function(){'mapbar.csv'},
   content = function(file){
     
     # inputs
@@ -541,9 +606,22 @@ output$seldl <- downloadHandler(
   }
 )
 
+# selected data
+output$seldl2 <- downloadHandler(
+  filename = function(){'segmentbar.csv'},
+  content = function(file){
+    
+    # inputs
+    segtab <- segtab()
+    
+    write.csv(segtab, file, quote = T, row.names = F)
+    
+  }
+)
+
 # selected segment data
 output$selsegdl1 <- downloadHandler(
-  filename = function(){'mapchange_selection.csv'},
+  filename = function(){'mapchange.csv'},
   content = function(file){
     
     # inputs
@@ -556,7 +634,7 @@ output$selsegdl1 <- downloadHandler(
 
 # selected segment data
 output$selsegdl2 <- downloadHandler(
-  filename = function(){'segment_selection.csv'},
+  filename = function(){'segmentchange.csv'},
   content = function(file){
     
     # inputs
@@ -585,8 +663,8 @@ Column {.tabset .tabset-fade}
 ```{r}
 column(12,
   br(),
-  column(4, selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')),
-  column(4, selectInput('flsel', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)),
+  column(4, selectInput('yrsel1', 'Select year on map:', choices = allsg$yr, selected = '2018')),
+  column(4, selectInput('flsel1', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)),
 )
 ```
 
@@ -594,7 +672,7 @@ column(12,
 
 ```{r}
 output$selplo <- renderPlotly(selplo())
-output$frmtab <- renderReactable(frmtab())
+output$frmseltab <- renderReactable(frmseltab())
 fillCol(flex = c(NA, 1),
   column(12, 
     column(3, selectInput('segres1', 'Choose summary output:', choices = c('plot', 'table')))
@@ -611,9 +689,9 @@ fillCol(flex = c(NA, 1),
       out <- fillCol(flex = c(NA, 1),
         renderUI({
           req(!is.null(edits()()$finished))
-          downloadBttn('seldl', 'Download data', style = 'simple', block = T, color = 'success')
+          downloadBttn('seldl1', 'Download data', style = 'simple', block = T, color = 'success')
         }),
-        reactableOutput('frmtab')
+        reactableOutput('frmseltab')
       )
       return(out)
     }
@@ -655,19 +733,58 @@ fillCol(flex = c(NA, 1),
 CHANGE BY BAY SEGMENT
 ===========================================================
 
+Column {data-width=250}
+-----------------------------------------------------------------------
+
+```{r}
+output$allmap2 <- renderLeaflet(allmap2())
+leafletOutput('allmap2', height = '100%')
+```
+
 Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
 ```{r}
 column(12,
   br(),
-  column(3, selectInput('snkseg', 'Choose bay segment:', choices = list('Old Tampa Bay' = 'OTB', 'Hillsborough Bay' = 'HB', 'Middle Tampa Bay' = 'MTB', 'Lower Tampa Bay' = 'LTB'))),
-  column(3, selectInput('flsel2', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)),
+  column(4, selectInput('yrsel2', 'Select year on map:', choices = allsg$yr, selected = '2018')),
+  column(4, selectInput('snkseg', 'Choose bay segment:', choices = list('Old Tampa Bay' = 'OTB', 'Hillsborough Bay' = 'HB', 'Middle Tampa Bay' = 'MTB', 'Lower Tampa Bay' = 'LTB'))),
+  column(4, selectInput('flsel2', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)),
 )
 
 ```
 
 ### BARPLOT
+
+```{r}
+output$segplo <- renderPlotly(segplo())
+output$frmsegtab <- renderReactable(frmsegtab())
+fillCol(flex = c(NA, 1),
+  column(12, 
+    column(3, selectInput('segres3', 'Choose summary output:', choices = c('plot', 'table')))
+    ),
+  renderUI({
+    
+    # input
+    segres3 <- input$segres3
+    
+    if(segres3 == 'plot')
+      return(plotlyOutput('segplo'))
+    
+    if(segres3 == 'table'){
+      out <- fillCol(flex = c(NA, 1),
+        renderUI({
+          req(!is.null(edits()()$finished))
+          downloadBttn('seldl2', 'Download data', style = 'simple', block = T, color = 'success')
+        }),
+        reactableOutput('frmsegtab')
+      )
+      return(out)
+    }
+    
+  })
+)
+```
 
 ### CHANGE PLOT
 
@@ -676,18 +793,18 @@ output$chgsegplo <- renderSankeyNetwork(chgsegplo())
 output$chgsegrcttab <- renderReactable(chgsegrcttab())
 fillCol(flex = c(NA, 1),
   column(12, 
-    column(3, selectInput('segres3', 'Choose summary output:', choices = c('plot', 'table'))),
+    column(3, selectInput('segres4', 'Choose summary output:', choices = c('plot', 'table'))),
     column(3, numericInput('nodpd2', 'Change spacing (plot only):', min = 0, max = 300, step = 10, value = 100))
     ),
   renderUI({
     
     # input
-    segres3 <- input$segres3
+    segres4 <- input$segres4
     
-    if(segres3 == 'plot')
+    if(segres4 == 'plot')
       return(sankeyNetworkOutput('chgsegplo'))
     
-    if(segres3 == 'table'){
+    if(segres4 == 'table'){
       out <- fillCol(flex = c(NA, 1),
         downloadBttn('selsegdl2', 'Download data', style = 'simple', block = T, color = 'success'),
         reactableOutput('chgsegrcttab')

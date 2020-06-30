@@ -96,3 +96,44 @@ sanplofun <- function(toplo, nodepd = 100){
   return(out)
   
 }
+
+# bar plot function, plotly
+barplofun <- function(toplo, cols, fontin = 'Lato Light'){
+  
+  p <- plot_ly(toplo, x = ~yr, y= ~Acres, color = ~Category, text = ~paste0(yr, ', ', Category, ', ', round(Acres, 0), ' acres'),
+               hoverinfo = 'text',  colors = cols, alpha = 0.7) %>%
+    add_bars() %>%
+    layout(
+      yaxis = list(title = 'Acres', gridcolor = '#ECECEC'),
+      xaxis = list(title = ''),
+      legend = list(x = 0, y = 1.1),
+      barmode = 'stack',
+      showlegend = T,
+      font = list(family = fontin),
+      plot_bgcolor = '#FFFFFF'
+    )
+  
+  return(p)
+  
+}
+
+# reactable table from bar pots
+bartabfun <- function(tab){
+  
+  out <- reactable(tab,
+    columns = list(
+      yr = colDef(name = 'Year'),
+      Total = colDef(name = 'Total (acres)')
+    ),
+    defaultColDef = colDef(
+      footerStyle = list(fontWeight = "bold"),
+      format = colFormat(digits = 0, separators = TRUE),
+      resizable = TRUE
+    ),
+    filterable = T,
+    defaultPageSize = 12
+  )
+  
+  return(out)
+  
+}

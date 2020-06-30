@@ -281,3 +281,103 @@ list(
     })
   )
 
+# bar plot data for segments ----------------------------------------------
+
+# load all data
+data(sgdat1988)
+data(sgdat1990)
+data(sgdat1992)
+data(sgdat1994)
+data(sgdat1996)
+data(sgdat1999)
+data(sgdat2001)
+data(sgdat2004)
+data(sgdat2006)
+data(sgdat2008)
+data(sgdat2010)
+data(sgdat2012)
+data(sgdat2014)
+data(sgdat2016)
+data(sgdat2018)
+
+prj <- 4326
+
+flcat <- list(
+  code = c('7210', '9113', '9116', '9121'),
+  name = c('sand', 'patchy', 'cont.', 'algae')
+)
+
+allsg <- list(
+  `1988` = sgdat1988,
+  `1990` = sgdat1990,
+  `1992` = sgdat1992,
+  `1994` = sgdat1994,
+  `1996` = sgdat1996,
+  `1999` = sgdat1999,
+  `2001` = sgdat2001,
+  `2004` = sgdat2004,
+  `2006` = sgdat2006,
+  `2008` = sgdat2008,
+  `2010` = sgdat2010,
+  `2012` = sgdat2012,
+  `2014` = sgdat2014,
+  `2016` = sgdat2016,
+  `2018` = sgdat2018
+) %>%
+  enframe('yr', 'data') %>%
+  mutate(
+    data = purrr::map(data, function(x){
+      
+      x <- x %>%
+        mutate(
+          FLUCCS_CODE = factor(FLUCCS_CODE, levels = flcat$code, labels = flcat$name)
+        ) %>%
+        select(OBJECTID, Category = FLUCCS_CODE)
+      
+      
+      st_crs(x) <- prj
+      
+      return(x)
+      
+    })
+  )
+
+segs <- tbseg$bay_segment
+
+bardat <- NULL
+for(i in seq_along(segs)){
+  
+  cat(i, '\n')
+  
+  seg <- segs[i]
+  toclp <- tbseg %>% 
+    filter(bay_segment %in% !!seg)
+  
+  clp <- allsg %>%
+    mutate(
+      data = purrr::map(data, function(x){
+        
+        x <- st_intersection(toclp, x) %>%
+          mutate(
+            area = st_area(.)
+          ) %>% 
+          st_set_geometry(NULL)
+        
+        return(x)
+        
+      })
+    ) %>% 
+    unnest('data') %>%
+    group_by(yr, Category) %>%
+    summarise(Acres = sum(area)) %>%
+    ungroup %>%
+    mutate(
+      Acres = set_units(Acres, 'acres'), 
+      bay_segment = seg
+      )
+  
+  bardat <- rbind(bardat, clp)
+  
+}
+
+save(bardat, file = 'data/bardat.RData', compress = 'xz')

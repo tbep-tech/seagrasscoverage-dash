@@ -239,7 +239,7 @@ crpsel <- reactive({
 
 })
 
-# selection from map as sf object, same crs as biodat
+# cropped sg data from map selection
 mapsel <- reactive({
 
   # input
@@ -267,12 +267,18 @@ chgmapsel <- reactive({
   
   # input
   crpsel <- crpsel()
+  flsel <- input$flsel
   edits <- edits()()
 
   # requires edits to continue
   validate(
     need(!is.null(edits$finished), 'Make a selection from the map using the draw features')
   )
+  
+  # regex for filter
+  fltval <- paste0('^', flsel) %>% 
+    gsub('\\.', '\\\\.', .) %>% 
+    paste(., collapse = '|')
 
   # get selection, calculate area
   tocrp <- edits$finished
@@ -291,7 +297,9 @@ chgmapsel <- reactive({
     need(chkarea > 1, paste0('Selected size is ', chkarea, ' acres and must be greater than 1 acre, please select a larger area'))
   )
 
-  out <- chgfun(crpsel)
+  out <- chgfun(crpsel) %>% 
+    filter(grepl(fltval, source)) %>% 
+    filter(grepl(fltval, target))  
   
   return(out)
   
@@ -329,7 +337,7 @@ frmtab <- reactive({
       resizable = TRUE
     ),
    filterable = T,
-   defaultPageSize = 15
+   defaultPageSize = 12
   )
 
   return(out)
@@ -372,7 +380,7 @@ selplo <- reactive({
 
 })
 
-# change plot selection
+# fluccs change plot selection
 chgselplo <- reactive({
   
   # inputs
@@ -380,6 +388,54 @@ chgselplo <- reactive({
   nodpd1 <- input$nodpd1
   
   out <- sanplofun(chgmapsel, nodpd1)
+  
+  return(out)
+  
+})
+
+# fluccs change table selection
+chgseltab <- reactive({
+  
+  # input
+  chgmapsel <- chgmapsel()
+  
+  out <- chgmapsel %>% 
+    mutate(
+      source_yr = as.numeric(gsub('^.*\\,\\s([0-9]+)$', '\\1', source)),
+      target_yr = as.numeric(gsub('^.*\\,\\s([0-9]+)$', '\\1', target)), 
+      source = gsub('\\,\\s[0-9]+$', '', source), 
+      target = gsub('\\,\\s[0-9]+$', '', target)
+    ) %>% 
+    spread(target, value, fill = 0) %>% 
+    rename(
+      Category = source, 
+      `Start year` = source_yr, 
+      `End year` = target_yr
+    )
+  
+  return(out)
+  
+})
+
+# fluccs change table by selection, reactable
+chgselrcttab <- reactive({
+  
+  # input
+  chgseltab <- chgseltab()
+  
+  out <- reactable(chgseltab,
+    columns = list(
+      `Start year` = colDef(format = colFormat(separators = F)),
+      `End year` = colDef(format = colFormat(separators = F))
+    ),
+    defaultColDef = colDef(
+      footerStyle = list(fontWeight = "bold"),
+      format = colFormat(digits = 0, separators = TRUE),
+      resizable = TRUE
+    ),
+   filterable = T,
+   defaultPageSize = 12
+  )
   
   return(out)
   
@@ -450,7 +506,7 @@ chgsegrcttab <- reactive({
       resizable = TRUE
     ),
    filterable = T,
-   defaultPageSize = 15
+   defaultPageSize = 12
   )
   
   return(out)
@@ -486,7 +542,20 @@ output$seldl <- downloadHandler(
 )
 
 # selected segment data
-output$selsegdl <- downloadHandler(
+output$selsegdl1 <- downloadHandler(
+  filename = function(){'mapchange_selection.csv'},
+  content = function(file){
+    
+    # inputs
+    chgseltab <- chgseltab()
+    
+    write.csv(chgseltab, file, quote = T, row.names = F)
+    
+  }
+)
+
+# selected segment data
+output$selsegdl2 <- downloadHandler(
   filename = function(){'segment_selection.csv'},
   content = function(file){
     
@@ -499,7 +568,7 @@ output$selsegdl <- downloadHandler(
 )
 ```
 
-MAP SUMMARY
+CHANGE BY SELECTION
 ===========================================================
 
 Column {data-width=250}
@@ -516,15 +585,8 @@ Column {.tabset .tabset-fade}
 ```{r}
 column(12,
   br(),
-  # wellPanel(style = "overflow-y:scroll; max-height: 200px; background-color:#F2F2F2",
-  column(4,
-    selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')
-    ),
-  column(4,
-    selectInput('flsel', 'Select categories:', choices = flcat$name, selected = flcat$name, multiple = T)
-    ),
-  column(4, numericInput('nodpd1', 'Change spacing:', min = 0, max = 300, step = 10, value = 100))
-  # )
+  column(4, selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')),
+  column(4, selectInput('flsel', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)),
 )
 ```
 
@@ -532,19 +594,31 @@ column(12,
 
 ```{r}
 output$selplo <- renderPlotly(selplo())
-plotlyOutput('selplo')
-```
-
-### TABULAR
-
-```{r}
 output$frmtab <- renderReactable(frmtab())
 fillCol(flex = c(NA, 1),
+  column(12, 
+    column(3, selectInput('segres1', 'Choose summary output:', choices = c('plot', 'table')))
+    ),
   renderUI({
-    req(!is.null(edits()()$finished))
-    downloadBttn('seldl', 'Download data', style = 'simple', block = T, color = 'success')
-  }),
-  reactableOutput('frmtab')
+    
+    # input
+    segres1 <- input$segres1
+    
+    if(segres1 == 'plot')
+      return(plotlyOutput('selplo'))
+    
+    if(segres1 == 'table'){
+      out <- fillCol(flex = c(NA, 1),
+        renderUI({
+          req(!is.null(edits()()$finished))
+          downloadBttn('seldl', 'Download data', style = 'simple', block = T, color = 'success')
+        }),
+        reactableOutput('frmtab')
+      )
+      return(out)
+    }
+    
+  })
 )
 ```
 
@@ -552,38 +626,70 @@ fillCol(flex = c(NA, 1),
 
 ```{r}
 output$chgselplo <- renderSankeyNetwork(chgselplo())
-sankeyNetworkOutput('chgselplo')
+output$chgselrcttab <- renderReactable(chgselrcttab())
+fillCol(flex = c(NA, 1),
+  column(12, 
+    column(3, selectInput('segres2', 'Choose summary output:', choices = c('plot', 'table'))),
+    column(3, numericInput('nodpd1', 'Change spacing (plot only):', min = 0, max = 300, step = 10, value = 100))
+    ),
+  renderUI({
+    
+    # input
+    segres2 <- input$segres2
+    
+    if(segres2 == 'plot')
+      return(sankeyNetworkOutput('chgselplo'))
+    
+    if(segres2 == 'table'){
+      out <- fillCol(flex = c(NA, 1),
+        downloadBttn('selsegdl1', 'Download data', style = 'simple', block = T, color = 'success'),
+        reactableOutput('chgselrcttab')
+      )
+      return(out)
+    }
+    
+  })
+)
 ```
 
-CHANGE BY SEGMENT
+CHANGE BY BAY SEGMENT
 ===========================================================
 
 Column {.tabset .tabset-fade}
 -----------------------------------------------------------------------
 
-### ALL YEARS
+```{r}
+column(12,
+  br(),
+  column(3, selectInput('snkseg', 'Choose bay segment:', choices = list('Old Tampa Bay' = 'OTB', 'Hillsborough Bay' = 'HB', 'Middle Tampa Bay' = 'MTB', 'Lower Tampa Bay' = 'LTB'))),
+  column(3, selectInput('flsel2', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)),
+)
+
+```
+
+### BARPLOT
+
+### CHANGE PLOT
 
 ```{r}
 output$chgsegplo <- renderSankeyNetwork(chgsegplo())
 output$chgsegrcttab <- renderReactable(chgsegrcttab())
 fillCol(flex = c(NA, 1),
   column(12, 
-    column(3, selectInput('snkseg', 'Choose bay segment:', choices = list('Old Tampa Bay' = 'OTB', 'Hillsborough Bay' = 'HB', 'Middle Tampa Bay' = 'MTB', 'Lower Tampa Bay' = 'LTB'))), 
-    column(3, selectInput('segres', 'Choose summary output:', choices = c('plot', 'table'))),
-    column(3, selectInput('flsel2', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)), 
+    column(3, selectInput('segres3', 'Choose summary output:', choices = c('plot', 'table'))),
     column(3, numericInput('nodpd2', 'Change spacing (plot only):', min = 0, max = 300, step = 10, value = 100))
     ),
   renderUI({
     
     # input
-    segres <- input$segres
+    segres3 <- input$segres3
     
-    if(segres == 'plot')
+    if(segres3 == 'plot')
       return(sankeyNetworkOutput('chgsegplo'))
     
-    if(segres == 'table'){
+    if(segres3 == 'table'){
       out <- fillCol(flex = c(NA, 1),
-        downloadBttn('selsegdl', 'Download data', style = 'simple', block = T, color = 'success'),
+        downloadBttn('selsegdl2', 'Download data', style = 'simple', block = T, color = 'success'),
         reactableOutput('chgsegrcttab')
       )
       return(out)

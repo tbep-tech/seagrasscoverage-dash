@@ -164,6 +164,8 @@ allmap <- reactive({
           filter(Category %in% flsel) %>%
           mutate(Category = fct_drop(Category))
 
+  st_crs(tomap) <- prj
+  
   # fix colors based on selection
   colreg <- cols[levels(tomap$Category)]
 

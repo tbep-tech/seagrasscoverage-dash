@@ -641,7 +641,7 @@ output$chgdl <- downloadHandler(
 )
 
 # comparison data
-output$chgdl <- downloadHandler(
+output$cmpdl <- downloadHandler(
   filename = function(){'mapcomparison.csv'},
   content = function(file){
     

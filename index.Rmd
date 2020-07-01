@@ -113,7 +113,7 @@ names(cols) <- c('sand', 'cont.', 'patchy', 'algae')
 fltallsg <- reactive({
 
   # input
-  flsel <- input$flsel
+  flsel <- c(input$flsel, 'other')
 
   out <- allsg %>%
     mutate(
@@ -155,7 +155,7 @@ allmap <- reactive({
 
   # input
   yrsel <- input$yrsel
-  flsel <- input$flsel
+  flsel <- c(input$flsel, 'other')
   
   flnm <- paste0('sgdat', yrsel, 'simp')
   load(file = paste0('data/', flnm, '.RData'))
@@ -316,7 +316,7 @@ mapsel <- reactive({
 
   # input
   crpsel <- crpsel()
-  flsel <- input$flsel
+  flsel <- c(input$flsel, 'other')
 
   # segment selection
   if(inherits(crpsel, 'character')){
@@ -357,7 +357,7 @@ chgmapsel <- reactive({
   
   # input
   crpsel <- crpsel()
-  flsel <- input$flsel
+  flsel <- c(input$flsel, 'other')
   edits <- edits()()
 
   # # requires edits to continue
@@ -526,7 +526,7 @@ cmpsel <- reactive({
   # input
   crpsel <- crpsel()
   fltallsg <- fltallsg()
-  flsel <- input$flsel
+  flsel <- c(input$flsel, 'other')
   yrcmp1 <- input$yrcmp1
   yrcmp2 <- input$yrcmp2
   edits <- edits()()
@@ -612,7 +612,7 @@ cmpselplo <- reactive({
 cmpselrcttab <- reactive({
   
   cmpsel <- cmpsel()
-  flsel <- input$flsel
+  flsel <- c(input$flsel, 'other')
   yrcmp1 <- input$yrcmp1
   yrcmp2 <- input$yrcmp2
   
@@ -657,7 +657,7 @@ output$cmpdl <- downloadHandler(
     
     # inputs
     cmpsel <- cmpsel()
-    flsel <- input$flsel
+    flsel <- c(input$flsel, 'other')
     yrcmp1 <- input$yrcmp1
     yrcmp2 <- input$yrcmp2
     
@@ -687,7 +687,7 @@ Column {.tabset .tabset-fade}
 column(12,
   br(),
   column(4, selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')),
-  column(4, selectInput('flsel', 'Select categories:', choices = c(flcat$name, 'other'), selected = c(flcat$name, 'other'), multiple = T)),
+  column(4, selectInput('flsel', 'Select categories:', choices = c(flcat$name), selected = c(flcat$name), multiple = T)),
   column(4, renderText(txtsel()))
 )
 ```

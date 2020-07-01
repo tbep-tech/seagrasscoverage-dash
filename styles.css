@@ -76,6 +76,10 @@ h5 {
   height: calc(100vh - 60px) !important;
 } 
 
+#map { /* this sets map editor height dynamically if in sidebar */
+  height: calc(100vh - 60px) !important;
+} 
+
 /* sub sections */
 
 .level3 {

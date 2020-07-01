@@ -526,10 +526,16 @@ cmpsel <- reactive({
   # input
   crpsel <- crpsel()
   fltallsg <- fltallsg()
+  flsel <- input$flsel
   yrcmp1 <- input$yrcmp1
   yrcmp2 <- input$yrcmp2
   edits <- edits()()
 
+  # regex for filter
+  fltval <- paste0('^', flsel) %>% 
+    gsub('\\.', '\\\\.', .) %>% 
+    paste(., collapse = '|')
+  
   # get selection, calculate area
   tocrp <- edits$finished
     
@@ -581,6 +587,10 @@ cmpsel <- reactive({
       chgfun
     
   }
+  
+  out <- out %>% 
+      filter(grepl(fltval, source)) %>% 
+      filter(grepl(fltval, target))  
   
   return(out)
   

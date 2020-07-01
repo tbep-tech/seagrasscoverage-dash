@@ -653,7 +653,7 @@ output$cmpdl <- downloadHandler(
     
     todl <- cmpselrctfun(cmpsel, flsel, yrcmp1, yrcmp2, frmout = T)
     
-    write.csv(chgseltab, file, quote = T, row.names = F)
+    write.csv(todl, file, quote = T, row.names = F)
     
   }
 )

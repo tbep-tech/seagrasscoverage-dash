@@ -137,3 +137,87 @@ bartabfun <- function(tab){
   return(out)
   
 }
+
+# reactable table function for year comparison
+cmpselrctfun <- function(cmpsel, flsel, yrcmp1, yrcmp2, frmout = FALSE){
+  
+  totab <- cmpsel %>%  
+    mutate(
+      # source_yr = as.numeric(gsub('^.*\\,\\s([0-9]+)$', '\\1', source)),
+      # target_yr = as.numeric(gsub('^.*\\,\\s([0-9]+)$', '\\1', target)), 
+      source = gsub('\\,\\s[0-9]+$', '', source), 
+      source = factor(source, levels = sort(flsel)),
+      target = gsub('\\,\\s[0-9]+$', '', target),
+      target = factor(target, levels = sort(flsel))
+    ) %>% 
+    complete(source, target) %>% 
+    spread(target, value, fill = 0) %>% 
+    mutate(Total = select_if(., is.numeric) %>% rowSums)
+  
+  srcttl <- select(totab, source, Total)
+  trgttl <- totab %>% 
+    select(-source, -Total) %>% 
+    gather('Category', 'Total') %>% 
+    group_by(Category) %>% 
+    summarise(Total = sum(Total)) %>% 
+    ungroup
+  
+  totab <- totab %>%
+    mutate(
+      chg = trgttl$Total - Total,
+      chgper = 100 * chg / Total, 
+      chgper = ifelse(is.na(chgper), 0, chgper),
+      chg = as.character(round(chg, 0)),
+      chgper = as.character(round(chgper, 1)), 
+      Total = as.character(round(Total, 0))
+    )
+
+  if(frmout){
+    
+    out <- totab %>%
+      select(-Total)
+    
+    return(out)
+    
+  } 
+  
+  jsfun <- JS("function(rowInfo) {
+    var value = rowInfo.row.chg
+    if (value >= 0) {
+      var color = '#008000E6'
+    } else if (value < 0) {
+      var color = '#e00000E6'
+    } 
+    return { color: color, fontWeight: 'bold' }
+    }"
+  ) 
+  
+  out <- reactable(
+    totab, 
+    columns = list(
+      source = colDef(name = '', footer = paste0(yrcmp2, ' total'), style = list(fontWeight = 'bold')), 
+      Total = colDef(name = paste0(yrcmp1, ' total'), style = list(fontWeight = 'bold')),
+      chg = colDef(name = paste0(yrcmp1, '-', yrcmp2, ' change (acres)'), style = jsfun), 
+      chgper = colDef(name = '% change', style = jsfun, format = colFormat(suffix = '%', digits = 0))
+    ),
+    defaultColDef = colDef(
+      footerStyle = list(fontWeight = "bold"),
+      footer = function(values){
+        if(!is.numeric(values))
+          return()
+        
+        round(sum(values), 0)
+        
+      },
+      format = colFormat(digits = 0, separators = TRUE),
+      resizable = TRUE
+    ),
+    defaultPageSize = nrow(totab),
+    showPageSizeOptions = F,
+    highlight = T,
+    wrap = T
+  )
+  
+  return(out)
+  
+}

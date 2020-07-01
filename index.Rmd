@@ -360,10 +360,10 @@ chgmapsel <- reactive({
   flsel <- input$flsel
   edits <- edits()()
 
-  # requires edits to continue
-  validate(
-    need(!is.null(edits$finished), 'Make a selection from the map using the draw features')
-  )
+  # # requires edits to continue
+  # validate(
+  #   need(!is.null(edits$finished), 'Make a selection from the map using the draw features')
+  # )
   
   # regex for filter
   fltval <- paste0('^', flsel) %>% 
@@ -519,6 +519,98 @@ chgselrcttab <- reactive({
   return(out)
   
 })
+
+# year v year comparison data selection
+cmpsel <- reactive({
+  
+  # input
+  crpsel <- crpsel()
+  fltallsg <- fltallsg()
+  yrcmp1 <- input$yrcmp1
+  yrcmp2 <- input$yrcmp2
+  edits <- edits()()
+
+  # get selection, calculate area
+  tocrp <- edits$finished
+    
+  # get geometry type
+  geotyp <- attr(st_geometry(tocrp), 'class')[1]
+
+  # get bay segment if point
+  if(geotyp == 'sfc_POINT'){
+    
+    toflt <- tbseg[tocrp, ]
+    
+    # crop and summarize by year
+    out <- fltallsg %>%
+      filter(yr %in% c(yrcmp1, yrcmp2)) %>% 
+      mutate(
+        data = purrr::map(data, function(x){
+  
+          x <- x[tbseg, ] %>%
+            mutate(
+              area = st_area(.)
+            ) 
+  
+          return(x)
+  
+        })
+      ) %>% 
+      chgfun
+    
+  }
+
+  if(geotyp =='sfc_POLYGON'){
+    
+    # check area of selection and validate
+    chkarea <- st_area(tocrp) %>%
+      set_units('acres') %>%
+      as.numeric %>% 
+      round(2)
+  
+    validate(
+      need(chkarea < 50000, paste0('Selected size is ', chkarea, ' acres and must be less than 50,000 acres, please select a smaller area'))
+    )
+    
+    validate(
+      need(chkarea > 1, paste0('Selected size is ', chkarea, ' acres and must be greater than 1 acre, please select a larger area'))
+    )
+    
+    out <- crpsel %>% 
+      filter(yr %in% c(yrcmp1, yrcmp2)) %>% 
+      chgfun
+    
+  }
+  
+  return(out)
+  
+})
+
+# year comparison plot
+cmpselplo <- reactive({
+  
+  # input
+  cmpsel <- cmpsel()
+
+  out <- sanplofun(cmpsel)
+  
+  return(out)
+  
+})
+
+# year comparison table
+cmpselrcttab <- reactive({
+  
+  cmpsel <- cmpsel()
+  flsel <- input$flsel
+  yrcmp1 <- input$yrcmp1
+  yrcmp2 <- input$yrcmp2
+  
+  out <- cmpselrctfun(cmpsel, flsel, yrcmp1, yrcmp2)
+  
+  return(out)
+  
+})
 ```
 
 ```{r downloadhandlers}
@@ -542,6 +634,24 @@ output$chgdl <- downloadHandler(
     
     # inputs
     chgseltab <- chgseltab()
+    
+    write.csv(chgseltab, file, quote = T, row.names = F)
+    
+  }
+)
+
+# comparison data
+output$chgdl <- downloadHandler(
+  filename = function(){'mapcomparison.csv'},
+  content = function(file){
+    
+    # inputs
+    cmpsel <- cmpsel()
+    flsel <- input$flsel
+    yrcmp1 <- input$yrcmp1
+    yrcmp2 <- input$yrcmp2
+    
+    todl <- cmpselrctfun(cmpsel, flsel, yrcmp1, yrcmp2, frmout = T)
     
     write.csv(chgseltab, file, quote = T, row.names = F)
     
@@ -579,7 +689,7 @@ output$selplo <- renderPlotly(selplo())
 output$frmseltab <- renderReactable(frmseltab())
 fillCol(flex = c(NA, 1),
   column(12, 
-    column(3, selectInput('segres1', 'Choose summary output:', choices = c('plot', 'table')))
+    column(4, selectInput('segres1', 'Choose summary output:', choices = c('plot', 'table')))
     ),
   renderUI({
     
@@ -587,18 +697,18 @@ fillCol(flex = c(NA, 1),
     segres1 <- input$segres1
     
     if(segres1 == 'plot')
-      return(plotlyOutput('selplo'))
+      out <- plotlyOutput('selplo')
     
-    if(segres1 == 'table'){
+    if(segres1 == 'table')
       out <- fillCol(flex = c(NA, 1),
         renderUI({
           req(!is.null(edits()()$finished))
           downloadBttn('seldl', 'Download data', style = 'simple', block = T, color = 'success')
         }),
         reactableOutput('frmseltab')
-      )
-      return(out)
-    }
+        )
+    
+    return(out)
     
   })
 )
@@ -611,8 +721,8 @@ output$chgselplo <- renderSankeyNetwork(chgselplo())
 output$chgselrcttab <- renderReactable(chgselrcttab())
 fillCol(flex = c(NA, 1),
   column(12, 
-    column(3, selectInput('segres2', 'Choose summary output:', choices = c('plot', 'table'))),
-    column(3, 
+    column(4, selectInput('segres2', 'Choose summary output:', choices = c('plot', 'table'))),
+    column(4, 
       renderUI({
         req(input$segres2 == 'plot')
         numericInput('nodpd', 'Change spacing:', min = 0, max = 300, step = 10, value = 100)
@@ -625,18 +735,53 @@ fillCol(flex = c(NA, 1),
     segres2 <- input$segres2
     
     if(segres2 == 'plot')
-      return(sankeyNetworkOutput('chgselplo'))
+      out <- sankeyNetworkOutput('chgselplo')
     
-    if(segres2 == 'table'){
+    if(segres2 == 'table')
       out <- fillCol(flex = c(NA, 1),
-        downloadBttn('chgdl', 'Download data', style = 'simple', block = T, color = 'success'),
+        renderUI({
+          req(!is.null(edits()()$finished))
+          downloadBttn('chgdl', 'Download data', style = 'simple', block = T, color = 'success')
+        }),
         reactableOutput('chgselrcttab')
       )
-      return(out)
-    }
+    
+    return(out)
     
   })
 )
 ```
 
 ### YEAR VS YEAR
+
+```{r}
+output$cmpselplo <- renderSankeyNetwork(cmpselplo())
+output$cmpselrcttab <- renderReactable(cmpselrcttab())
+fillCol(flex = c(NA, 1),
+  column(12, 
+    column(4, selectInput('segres3', 'Choose summary output:', choices = c('plot', 'table'))),
+    column(4, selectInput('yrcmp1', 'Choose first year:', choices = allsg$yr, selected = '2016')),
+    column(4, selectInput('yrcmp2', 'Choose second year:', choices = allsg$yr, selected = '2018'))
+  ),
+  renderUI({
+    
+    # input
+    segres3 <- input$segres3
+    
+    if(segres3 == 'plot')
+      out <- sankeyNetworkOutput('cmpselplo')
+    
+    if(segres3 == 'table')
+      out <- fillCol(flex = c(NA, 1),
+        renderUI({
+          req(!is.null(edits()()$finished))
+          downloadBttn('cmpdl', 'Download data', style = 'simple', block = T, color = 'success')
+        }),
+        reactableOutput('cmpselrcttab')
+      )
+
+    return(out)
+    
+  })
+)
+```

@@ -3,7 +3,7 @@ chgfun <- function(crpsel){
   
   yrs <- crpsel %>% 
     pull(yr)
-  
+
   out <- NULL
   for(i in seq_along(yrs)){
     
@@ -11,7 +11,7 @@ chgfun <- function(crpsel){
     yr1 <- yrs[i] 
     yr2 <- yrs[i + 1] 
     
-    if(yr1 == '2018')
+    if(yr1 == yrs[length(yrs)])
       next()
 
     cat(paste(yr1, yr2, sep = ', '), '\t')

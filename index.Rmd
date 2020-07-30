@@ -180,8 +180,13 @@ allmap <- reactive({
       fillColor = ~long_name, 
       fillOpacity = 0,
       label = ~paste0(bay_segment, ': ', long_name)
+    ) %>% 
+    addCircles(
+      data = trnpts, 
+      weight = 10,
+      fillColor = I('red'),
+      color = I('red')
     )
-
 
   return(out)
 

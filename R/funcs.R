@@ -70,7 +70,7 @@ chgfun <- function(crpsel){
 }
 
 # sankey plot function
-sanplofun <- function(toplo, nodepd = 100){
+sanplofun <- function(toplo, nodepd = 100, fontsize = 12, iterations = 3){
   
   nodes <- data.frame(name = c(as.character(toplo$source), as.character(toplo$target))) %>% 
     unique() %>% 
@@ -91,7 +91,7 @@ sanplofun <- function(toplo, nodepd = 100){
   out <- sankeyNetwork(Links = toplo[, -c(1, 2)], Nodes = nodes, NodeGroup = "group", colourScale = cols,
                        Source = "IDsource", Target = "IDtarget",
                        Value = "value", NodeID = "name", 
-                       sinksRight=F, units = 'acres', nodeWidth = 20, fontSize = 12, nodePadding = nodepd, iterations = 3)
+                       sinksRight=F, units = 'acres', nodeWidth = 20, fontSize = fontsize, nodePadding = nodepd, iterations = iterations)
   
   return(out)
   

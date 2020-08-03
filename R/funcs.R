@@ -98,7 +98,7 @@ sanplofun <- function(toplo, nodepd = 100, fontsize = 12, iterations = 3){
 }
 
 # bar plot function, plotly
-barplofun <- function(toplo, cols, fontin = 'Lato Light'){
+barplofun <- function(toplo, cols, fontin = 'Lato Light', fontsize = 12){
   
   p <- plot_ly(toplo, x = ~yr, y= ~Acres, color = ~Category, text = ~paste0(yr, ', ', Category, ', ', round(Acres, 0), ' acres'),
                hoverinfo = 'text',  colors = cols, alpha = 0.7) %>%
@@ -109,7 +109,7 @@ barplofun <- function(toplo, cols, fontin = 'Lato Light'){
       legend = list(x = 0, y = 1.1),
       barmode = 'stack',
       showlegend = T,
-      font = list(family = fontin),
+      font = list(family = fontin, size = fontsize),
       plot_bgcolor = '#FFFFFF'
     )
   

@@ -65,6 +65,7 @@ data(sgdat2012)
 data(sgdat2014)
 data(sgdat2016)
 data(sgdat2018)
+data(sgdat2020)
 
 prj <- 4326
 
@@ -83,7 +84,8 @@ allsg <- list(
     `2012` = sgdat2012,
     `2014` = sgdat2014,
     `2016` = sgdat2016,
-    `2018` = sgdat2018
+    `2018` = sgdat2018, 
+    `2020` = sgdat2020
   ) %>%
   enframe('yr', 'data') %>%
   mutate(
@@ -91,9 +93,9 @@ allsg <- list(
 
       x <- x %>%
         mutate(
-          FLUCCS_CODE = factor(FLUCCS_CODE, levels = flcat$code, labels = flcat$name)
+          FLUCCSCODE = factor(FLUCCSCODE, levels = flcat$code, labels = flcat$name)
         ) %>%
-        select(OBJECTID, Category = FLUCCS_CODE)
+        select(Category = FLUCCSCODE)
 
 
       st_crs(x) <- prj
@@ -691,7 +693,7 @@ Column {.tabset .tabset-fade}
 ```{r}
 column(12,
   br(),
-  column(4, selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2018')),
+  column(4, selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2020')),
   column(4, selectInput('flsel', 'Select categories:', choices = c(flcat$name), selected = c(flcat$name), multiple = T)),
   column(4, renderText(txtsel()))
 )
@@ -775,8 +777,8 @@ output$cmpselrcttab <- renderReactable(cmpselrcttab())
 fillCol(flex = c(NA, 1),
   column(12, 
     column(4, selectInput('segres3', 'Choose summary output:', choices = c('plot', 'table'))),
-    column(4, selectInput('yrcmp1', 'Choose first year:', choices = allsg$yr, selected = '2016')),
-    column(4, selectInput('yrcmp2', 'Choose second year:', choices = allsg$yr, selected = '2018'))
+    column(4, selectInput('yrcmp1', 'Choose first year:', choices = allsg$yr, selected = '2018')),
+    column(4, selectInput('yrcmp2', 'Choose second year:', choices = allsg$yr, selected = '2020'))
   ),
   renderUI({
     

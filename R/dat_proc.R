@@ -5,6 +5,7 @@ library(mapview)
 library(doParallel)
 library(foreach)
 library(units)
+library(here)
 
 # download raw data, clip, and save ---------------------------------------
 
@@ -47,8 +48,8 @@ for(i in 1:length(fls)){
   dat_crp <- dat_raw %>%
     st_transform(crs = prj) %>%
     .[segs, ] %>% 
-    filter(FLUCCS_CODE %in% c(9113, 9116, 7210, 9121)) %>% 
-    select(OBJECTID, FLUCCS_CODE) %>% 
+    filter(FLUCCSCODE %in% c(9113, 9116, 7210, 9121)) %>% 
+    select(FLUCCSCODE) %>% 
     st_buffer(dist = 0)
 
   # name assignment and save
@@ -117,9 +118,9 @@ allsg <- list(
 
       x <- x %>%
         mutate(
-          FLUCCS_CODE = factor(FLUCCS_CODE, levels = flcat$code, labels = flcat$name)
+          FLUCCSCODE = factor(FLUCCSCODE, levels = flcat$code, labels = flcat$name)
         ) %>%
-        select(OBJECTID, Category = FLUCCS_CODE)
+        select(Category = FLUCCSCODE)
 
 
       st_crs(x) <- prj
@@ -258,9 +259,9 @@ list(
       
       x <- data %>%
         mutate(
-          FLUCCS_CODE = factor(FLUCCS_CODE, levels = flcat$code, labels = flcat$name)
+          FLUCCSCODE = factor(FLUCCSCODE, levels = flcat$code, labels = flcat$name)
         ) %>%
-        select(OBJECTID, Category = FLUCCS_CODE)
+        select(Category = FLUCCSCODE)
       
       st_crs(x) <- prj
       
@@ -327,9 +328,9 @@ allsg <- list(
       
       x <- x %>%
         mutate(
-          FLUCCS_CODE = factor(FLUCCS_CODE, levels = flcat$code, labels = flcat$name)
+          FLUCCSCODE = factor(FLUCCSCODE, levels = flcat$code, labels = flcat$name)
         ) %>%
-        select(OBJECTID, Category = FLUCCS_CODE)
+        select(Category = FLUCCSCODE)
       
       
       st_crs(x) <- prj

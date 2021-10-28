@@ -10,54 +10,37 @@ library(units)
 
 prj <- 4326
 
-urls <- list(
-  `2018` = 'https://opendata.arcgis.com/datasets/8d0d473468924423bf0f1682aaca790f_0.geojson',
-  `2016` = 'https://opendata.arcgis.com/datasets/f0ecff0cf0de491685f8fb074adb278b_20.geojson',
-  `2014` = 'https://opendata.arcgis.com/datasets/f530f972ded749adb1c6b20c2651e7f9_18.geojson',
-  `2012` = 'https://opendata.arcgis.com/datasets/619bd267e4c54e70968abd86eb92318e_17.geojson',
-  `2010` = 'https://opendata.arcgis.com/datasets/82153be25a3340a0abdb3ec713425f29_16.geojson',
-  `2008` = 'https://opendata.arcgis.com/datasets/4ddc60a8c9f845a2912c4e7cb14a3b7b_15.geojson',
-  `2006` = 'https://opendata.arcgis.com/datasets/5a72bbd64bc9486696fa0bc47ca4e30c_13.geojson', 
-  `2004` = 'https://opendata.arcgis.com/datasets/bb6b117c8eab40209d8125c3c95f6150_12.geojson', 
-  `2001` = 'https://opendata.arcgis.com/datasets/e2ce063712f34654a4f371240f541479_11.geojson', 
-  `1999` = 'https://opendata.arcgis.com/datasets/e27b6e5148514f29a1f1483813297fd7_10.geojson', 
-  `1996` = 'https://opendata.arcgis.com/datasets/38f62dd9b6e5482888b2c0bb51716b6e_9.geojson',
-  `1994` = 'https://opendata.arcgis.com/datasets/a2fb9d100cfd441cbdd24b16a3b0ce53_8.geojson',
-  `1992` = 'https://opendata.arcgis.com/datasets/ea9fab53f2f74236b0cba8980dffe363_7.geojson',
-  `1990` = 'https://opendata.arcgis.com/datasets/bcc955216c62468c9a6dafffc0545a40_6.geojson',
-  `1988` = 'https://opendata.arcgis.com/datasets/092df867ece945b787557c9a7cf811d8_5.geojson'
-  ) %>% 
-  enframe 
+# all zipped files on amazon s3
+# downloaded from here https://data-swfwmd.opendata.arcgis.com/
+fls <- c('88', '90', '92', '94', '96', '99', '01', '04', '06', '08', '10', '12', '14', '16', '18', '20') %>% 
+  paste0('https://swfwmd-seagrass.s3.amazonaws.com/sg', ., '.zip')
 
-# setup parallel backend
-ncores <- detectCores() - 1 
-cl <- makeCluster(ncores)
-registerDoParallel(cl)
-strt <- Sys.time()
+for(i in 1:length(fls)){
+  
+  cat(i, 'of', length(fls), '\n')
+  
+  ## import file
+  
+  # download from s3, unzip
+  tmpdir <- here('data/tmp')
+  tmpzip <- here('data/tmp/tmp.zip')
+  dir.create(tmpdir)
+  download.file(fls[i], destfile = tmpzip)
+  unzip(tmpzip, exdir = tmpdir)
+  
+  # import shapefile
+  toimp <- list.files(tmpdir, pattern = '\\.shp$', full.names = T)
+  dat_raw <- st_read(toimp, quiet = T)
+  
+  # delete files
+  unlink(tmpdir, recursive = T)
+  
+  if(any(c('FLUCCS_CODE', 'FLUCCS_COD') %in% names(dat_raw)))
+    names(dat_raw) <- gsub('^FLUCCS\\_COD$|^FLUCCS\\_CODE$', 'FLUCCSCODE', names(dat_raw))
 
-res <- foreach(i = 1:nrow(urls), .packages = c('tidyverse', 'sf')) %dopar% {
-  
-  sink('log.txt')
-  cat(i, 'of', nrow(urls), '\n')
-  print(Sys.time()-strt)
-  sink()
-  
-  # original in NAD83_HARN_Florida_West_ftUS, transform to wgs84
-  prj <- 4326
-
-  # import file
-  dat_raw <- urls[i, ] %>% 
-    pull(value) %>% 
-    .[[1]] %>% 
-    st_read
-  
   # clip bounaries
   segs <- st_read('~/Desktop/TBEP/GISboundaries/GISboundaries/TBEP_Bay_Segments_Correct_Projection.shp') %>% 
     st_transform(crs = prj)
-  
-  if('FLUCCSCODE' %in% names(dat_raw))
-    dat_raw <- dat_raw %>% 
-      rename(FLUCCS_CODE = FLUCCSCODE)
   
   # crop by watershed and select fluccs
   # 9113 is patchy, 9116 is continuous
@@ -69,10 +52,18 @@ res <- foreach(i = 1:nrow(urls), .packages = c('tidyverse', 'sf')) %dopar% {
     st_buffer(dist = 0)
 
   # name assignment and save
-  flnm <- paste0('sgdat', urls$name[i])
+  # name assignment and save
+  flnm <- gsub('^sg|\\.zip$', '', basename(fls[i])) %>% 
+    as.numeric
+  if(flnm > 80){
+    flnm <- paste0('19', flnm)
+  } else {
+    flnm <- paste0('20', sprintf("%02d", flnm))
+  }
+  flnm <- paste0('sgdat', flnm)
   assign(flnm, dat_crp)
-  save(list = flnm, file = paste0('data/', flnm, '.RData'), compress = 'xz')
-
+  save(list = flnm, file = here('data', paste0('/', flnm, '.RData')), compress = 'xz')
+  
 }
 
 # area change for sankey --------------------------------------------------
@@ -93,6 +84,7 @@ data(sgdat2012)
 data(sgdat2014)
 data(sgdat2016)
 data(sgdat2018)
+data(sgdat2020)
 
 prj <- 4326
 
@@ -116,7 +108,8 @@ allsg <- list(
   `2012` = sgdat2012,
   `2014` = sgdat2014,
   `2016` = sgdat2016,
-  `2018` = sgdat2018
+  `2018` = sgdat2018,
+  `2020` = sgdat2020
 ) %>%
   enframe('yr', 'data') %>%
   mutate(
@@ -149,7 +142,7 @@ for(i in 1:nrow(inds)){
   yr1 <- inds[i, ] %>% pull(yr)
   yr2 <- inds[i + 1, ] %>% pull(yr)
 
-  if(yr1 == '2018')
+  if(yr1 == '2020')
     next()
   
   # segment
@@ -232,6 +225,7 @@ data(sgdat2012)
 data(sgdat2014)
 data(sgdat2016)
 data(sgdat2018)
+data(sgdat2020)
 
 prj <- 4326
 
@@ -255,7 +249,8 @@ list(
   `2012` = sgdat2012,
   `2014` = sgdat2014,
   `2016` = sgdat2016,
-  `2018` = sgdat2018
+  `2018` = sgdat2018,
+  `2020` = sgdat2020
   ) %>%
   enframe('yr', 'data') %>%
   mutate(
@@ -299,6 +294,7 @@ data(sgdat2012)
 data(sgdat2014)
 data(sgdat2016)
 data(sgdat2018)
+data(sgdat2020)
 
 prj <- 4326
 
@@ -322,7 +318,8 @@ allsg <- list(
   `2012` = sgdat2012,
   `2014` = sgdat2014,
   `2016` = sgdat2016,
-  `2018` = sgdat2018
+  `2018` = sgdat2018,
+  `2020` = sgdat2020
 ) %>%
   enframe('yr', 'data') %>%
   mutate(

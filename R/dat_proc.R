@@ -11,9 +11,11 @@ library(here)
 
 prj <- 4326
 
+sf_use_s2(FALSE)
+
 # all zipped files on amazon s3
 # downloaded from here https://data-swfwmd.opendata.arcgis.com/
-fls <- c('88', '90', '92', '94', '96', '99', '01', '04', '06', '08', '10', '12', '14', '16', '18', '20') %>% 
+fls <- c('88', '90', '92', '94', '96', '99', '01', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22') %>% 
   paste0('https://swfwmd-seagrass.s3.amazonaws.com/sg', ., '.zip')
 
 for(i in 1:length(fls)){
@@ -40,8 +42,8 @@ for(i in 1:length(fls)){
     names(dat_raw) <- gsub('^FLUCCS\\_COD$|^FLUCCS\\_CODE$', 'FLUCCSCODE', names(dat_raw))
 
   # clip bounaries
-  segs <- st_read('~/Desktop/TBEP/GISboundaries/GISboundaries/TBEP_Bay_Segments_Correct_Projection.shp') %>% 
-    st_transform(crs = prj)
+  segs <- st_read(here('data/raw/TBEP_Bay_Segments_Correct_Projection.shp')) %>% 
+    st_transform(crs = prj) 
   
   # crop by watershed and select fluccs
   # 9113 is patchy, 9116 is continuous
@@ -86,6 +88,7 @@ data(sgdat2014)
 data(sgdat2016)
 data(sgdat2018)
 data(sgdat2020)
+data(sgdat2022)
 
 prj <- 4326
 
@@ -110,7 +113,8 @@ allsg <- list(
   `2014` = sgdat2014,
   `2016` = sgdat2016,
   `2018` = sgdat2018,
-  `2020` = sgdat2020
+  `2020` = sgdat2020, 
+  `2022` = sgdat2022
 ) %>%
   enframe('yr', 'data') %>%
   mutate(
@@ -143,7 +147,7 @@ for(i in 1:nrow(inds)){
   yr1 <- inds[i, ] %>% pull(yr)
   yr2 <- inds[i + 1, ] %>% pull(yr)
 
-  if(yr1 == '2020')
+  if(yr1 == '2022')
     next()
   
   # segment
@@ -227,6 +231,7 @@ data(sgdat2014)
 data(sgdat2016)
 data(sgdat2018)
 data(sgdat2020)
+data(sgdat2022)
 
 prj <- 4326
 
@@ -251,7 +256,8 @@ list(
   `2014` = sgdat2014,
   `2016` = sgdat2016,
   `2018` = sgdat2018,
-  `2020` = sgdat2020
+  `2020` = sgdat2020,
+  `2022` = sgdat2022
   ) %>%
   enframe('yr', 'data') %>%
   mutate(
@@ -296,6 +302,7 @@ data(sgdat2014)
 data(sgdat2016)
 data(sgdat2018)
 data(sgdat2020)
+data(sgdat2022)
 
 prj <- 4326
 
@@ -320,7 +327,8 @@ allsg <- list(
   `2014` = sgdat2014,
   `2016` = sgdat2016,
   `2018` = sgdat2018,
-  `2020` = sgdat2020
+  `2020` = sgdat2020,
+  `2022` = sgdat2022
 ) %>%
   enframe('yr', 'data') %>%
   mutate(

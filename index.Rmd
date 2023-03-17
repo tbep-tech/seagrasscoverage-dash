@@ -66,6 +66,7 @@ data(sgdat2014)
 data(sgdat2016)
 data(sgdat2018)
 data(sgdat2020)
+data(sgdat2022)
 
 prj <- 4326
 
@@ -85,7 +86,8 @@ allsg <- list(
     `2014` = sgdat2014,
     `2016` = sgdat2016,
     `2018` = sgdat2018, 
-    `2020` = sgdat2020
+    `2020` = sgdat2020, 
+    `2022` = sgdat2022
   ) %>%
   enframe('yr', 'data') %>%
   mutate(
@@ -693,7 +695,7 @@ Column {.tabset .tabset-fade}
 ```{r}
 column(12,
   br(),
-  column(4, selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2020')),
+  column(4, selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2022')),
   column(4, selectInput('flsel', 'Select categories:', choices = c(flcat$name), selected = c(flcat$name), multiple = T)),
   column(4, renderText(txtsel()))
 )
@@ -778,7 +780,7 @@ fillCol(flex = c(NA, 1),
   column(12, 
     column(4, selectInput('segres3', 'Choose summary output:', choices = c('plot', 'table'))),
     column(4, selectInput('yrcmp1', 'Choose first year:', choices = allsg$yr, selected = '2018')),
-    column(4, selectInput('yrcmp2', 'Choose second year:', choices = allsg$yr, selected = '2020'))
+    column(4, selectInput('yrcmp2', 'Choose second year:', choices = allsg$yr, selected = '2022'))
   ),
   renderUI({
     

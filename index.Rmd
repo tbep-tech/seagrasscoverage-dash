@@ -47,6 +47,13 @@ flcat <- list(
   name = c('sand', 'cont.', 'patchy', 'algae')
 )
 
+trnlns <- trnlns %>% 
+  dplyr::filter(Site %in% unique(transect$Transect)) %>% 
+  dplyr::filter(Site %in% trnpts$TRAN_ID) %>% 
+  dplyr::filter(!duplicated(Site)) %>% 
+  dplyr::select(Site) %>% 
+  sf::st_zm()
+
 data(chgdat)
 data(bardat)
 
@@ -173,7 +180,7 @@ allmap <- reactive({
   # fix colors based on selection
   colreg <- cols[levels(tomap$Category)]
 
-  out <- mapview(tomap, homebutton = F, zcol = 'Category', layer.name = 'Category', col.regions = colreg, color = 'grey', lwd = 0) %>%
+  out <- mapview(tomap, homebutton = F, zcol = 'Category', layer.name = 'Category', col.regions = colreg, color = 'grey', lwd = 0) %>% 
     .@map %>% 
     addPolygons(
       data = tbseg, 
@@ -185,13 +192,17 @@ allmap <- reactive({
       fillOpacity = 0,
       label = ~paste0(bay_segment, ': ', long_name)
     ) %>% 
-    addCircles(
-      data = trnpts, 
-      weight = 10,
+    addPolylines(
+      data = trnlns,
+      stroke = T,
       fillColor = I('red'),
-      color = I('red')
+      color = I('red'),
+      fill = T,
+      weight = 7,
+      opacity = 0.5,
+      fillOpacity = 0.5
     )
-
+  
   return(out)
 
 })

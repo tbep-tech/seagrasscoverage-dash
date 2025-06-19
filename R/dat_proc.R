@@ -15,7 +15,7 @@ sf_use_s2(FALSE)
 
 # all zipped files on amazon s3
 # downloaded from here https://data-swfwmd.opendata.arcgis.com/
-fls <- c('88', '90', '92', '94', '96', '99', '01', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22') %>% 
+fls <- c('88', '90', '92', '94', '96', '99', '01', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22', '24') %>% 
   paste0('https://swfwmd-seagrass.s3.amazonaws.com/sg', ., '.zip')
 
 for(i in 1:length(fls)){
@@ -38,8 +38,8 @@ for(i in 1:length(fls)){
   # delete files
   unlink(tmpdir, recursive = T)
   
-  if(any(c('FLUCCS_CODE', 'FLUCCS_COD') %in% names(dat_raw)))
-    names(dat_raw) <- gsub('^FLUCCS\\_COD$|^FLUCCS\\_CODE$', 'FLUCCSCODE', names(dat_raw))
+  if(any(c('FLUCCS_CODE', 'FLUCCS_COD', 'FLUCCS_Cod') %in% names(dat_raw)))
+    names(dat_raw) <- gsub('^FLUCCS\\_COD$|^FLUCCS\\_CODE$|^FLUCCS_Cod$', 'FLUCCSCODE', names(dat_raw))
 
   # clip bounaries
   segs <- st_read(here('data/raw/TBEP_Bay_Segments_Correct_Projection.shp')) %>% 
@@ -50,8 +50,8 @@ for(i in 1:length(fls)){
   dat_crp <- dat_raw %>%
     st_transform(crs = prj) %>%
     .[segs, ] %>% 
-    filter(FLUCCSCODE %in% c(9113, 9116, 7210, 9121)) %>% 
-    select(FLUCCSCODE) %>% 
+    dplyr::filter(FLUCCSCODE %in% c(9113, 9116, 7210, 9121)) %>% 
+    dplyr::select(FLUCCSCODE) %>% 
     st_buffer(dist = 0)
 
   # name assignment and save
@@ -89,6 +89,7 @@ data(sgdat2016)
 data(sgdat2018)
 data(sgdat2020)
 data(sgdat2022)
+data(sgdat2024)
 
 prj <- 4326
 
@@ -114,17 +115,18 @@ allsg <- list(
   `2016` = sgdat2016,
   `2018` = sgdat2018,
   `2020` = sgdat2020, 
-  `2022` = sgdat2022
+  `2022` = sgdat2022,
+  `2024` = sgdat2024
 ) %>%
   enframe('yr', 'data') %>%
-  mutate(
+  dplyr::mutate(
     data = purrr::map(data, function(x){
 
       x <- x %>%
-        mutate(
+        dplyr::mutate(
           FLUCCSCODE = factor(FLUCCSCODE, levels = flcat$code, labels = flcat$name)
         ) %>%
-        select(Category = FLUCCSCODE)
+        dplyr::select(Category = FLUCCSCODE)
 
 
       st_crs(x) <- prj
@@ -147,7 +149,7 @@ for(i in 1:nrow(inds)){
   yr1 <- inds[i, ] %>% pull(yr)
   yr2 <- inds[i + 1, ] %>% pull(yr)
 
-  if(yr1 == '2022')
+  if(yr1 == '2024')
     next()
   
   # segment
@@ -159,7 +161,7 @@ for(i in 1:nrow(inds)){
   cat(paste(seg, yr1, yr2, sep = ', '), '\t')
 
   a <- allsg %>%
-    filter(yr %in% !!yr1) %>%
+    dplyr::filter(yr %in% !!yr1) %>%
     pull(data) %>%
     .[[1]] %>%
     .[toclp, ] %>%
@@ -168,7 +170,7 @@ for(i in 1:nrow(inds)){
     st_union(by_feature=TRUE) %>%
     mutate(Category = paste0(Category, ', ', yr1))
   b <- allsg %>%
-    filter(yr %in% !!yr2) %>%
+    dplyr::filter(yr %in% !!yr2) %>%
     pull(data) %>%
     .[[1]] %>%
     .[toclp, ] %>%
@@ -196,9 +198,9 @@ for(i in 1:nrow(inds)){
       Acres = set_units(Acres, 'acres'),
       Acres = as.numeric(Acres)
     ) %>%
-    select(-yr, -yr.1) %>%
+    dplyr::select(-yr, -yr.1) %>%
     st_set_geometry(NULL) %>%
-    select(Category.1, Category, Acres) %>%
+    dplyr::select(Category.1, Category, Acres) %>%
     group_by(Category.1, Category) %>%
     summarise(Acres = sum(Acres)) %>%
     ungroup %>%
@@ -232,6 +234,7 @@ data(sgdat2016)
 data(sgdat2018)
 data(sgdat2020)
 data(sgdat2022)
+data(sgdat2024)
 
 prj <- 4326
 
@@ -257,7 +260,8 @@ list(
   `2016` = sgdat2016,
   `2018` = sgdat2018,
   `2020` = sgdat2020,
-  `2022` = sgdat2022
+  `2022` = sgdat2022,
+  `2024` = sgdat2024
   ) %>%
   enframe('yr', 'data') %>%
   mutate(
@@ -267,7 +271,7 @@ list(
         mutate(
           FLUCCSCODE = factor(FLUCCSCODE, levels = flcat$code, labels = flcat$name)
         ) %>%
-        select(Category = FLUCCSCODE)
+        dplyr::select(Category = FLUCCSCODE)
       
       st_crs(x) <- prj
       
@@ -303,6 +307,7 @@ data(sgdat2016)
 data(sgdat2018)
 data(sgdat2020)
 data(sgdat2022)
+data(sgdat2024)
 
 prj <- 4326
 
@@ -328,7 +333,8 @@ allsg <- list(
   `2016` = sgdat2016,
   `2018` = sgdat2018,
   `2020` = sgdat2020,
-  `2022` = sgdat2022
+  `2022` = sgdat2022,
+  `2024` = sgdat2024
 ) %>%
   enframe('yr', 'data') %>%
   mutate(
@@ -338,7 +344,7 @@ allsg <- list(
         mutate(
           FLUCCSCODE = factor(FLUCCSCODE, levels = flcat$code, labels = flcat$name)
         ) %>%
-        select(Category = FLUCCSCODE)
+        dplyr::select(Category = FLUCCSCODE)
       
       
       st_crs(x) <- prj

@@ -66,16 +66,17 @@ colnames(count_mat) <- years
 all_bounds <- bind_cols(all_bounds, as_tibble(count_mat)) |>
   mutate(n_years = rowSums(count_mat))
 
-# Four-panel plot: frequency bands split across the 18-survey time period ----
-
+#Simple plot showing results
 p <- ggplot(sgdat_freq) +
-        geom_sf(aes(fill = n_years), color = NA) +
-        scale_fill_gradient(
-           name = 'Years\nMapped',
-           low = '#D3FFBE',
-           high = '#267300'
-          ) +
-        theme_void()
+  geom_sf(aes(fill = n_years), color = NA) +
+  scale_fill_gradient(
+    name = 'Years\nMapped',
+    low = '#D3FFBE',
+    high = '#267300'
+  ) +
+  theme_void()
+
+# Four-panel plot: frequency bands split across the 18-survey time period ----
 
 freq_breaks <- c(0, 4, 9, 13, 18)
 freq_labels  <- c('1–4 years', '5–9 years', '10–13 years', '14–18 years')

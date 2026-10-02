@@ -1,3 +1,43 @@
+# get full seagrass layer for a year, loads from file if not in sgcache environment
+getsg <- function(yr, sgcache, flcat, prj){
+
+  if(!exists(yr, envir = sgcache, inherits = F)){
+
+    flnm <- paste0('sgdat', yr)
+    load(file = paste0('data/', flnm, '.RData'))
+
+    x <- get(flnm) %>%
+      mutate(
+        FLUCCSCODE = factor(FLUCCSCODE, levels = flcat$code, labels = flcat$name)
+      ) %>%
+      select(Category = FLUCCSCODE)
+
+    st_crs(x) <- prj
+
+    assign(yr, x, envir = sgcache)
+
+  }
+
+  get(yr, envir = sgcache)
+
+}
+
+# full seagrass layers for selected years, filtered by category, as nested tibble
+getallsg <- function(yrsel, flsel, sgcache, flcat, prj){
+
+  tibble(yr = yrsel) %>%
+    mutate(
+      data = purrr::map(yr, function(x){
+
+        getsg(x, sgcache, flcat, prj) %>%
+          filter(Category %in% flsel) %>%
+          mutate(Category = fct_drop(Category))
+
+      })
+    )
+
+}
+
 # get change over time by complete union
 chgfun <- function(crpsel){
   

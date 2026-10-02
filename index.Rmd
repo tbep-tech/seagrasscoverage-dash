@@ -57,64 +57,18 @@ trnlns <- trnlns %>%
 data(chgdat)
 data(bardat)
 
-data(sgdat1988)
-data(sgdat1990)
-data(sgdat1992)
-data(sgdat1994)
-data(sgdat1996)
-data(sgdat1999)
-data(sgdat2001)
-data(sgdat2004)
-data(sgdat2006)
-data(sgdat2008)
-data(sgdat2010)
-data(sgdat2012)
-data(sgdat2014)
-data(sgdat2016)
-data(sgdat2018)
-data(sgdat2020)
-data(sgdat2022)
-data(sgdat2024)
-
 prj <- 4326
 
-allsg <- list(
-    `1988` = sgdat1988,
-    `1990` = sgdat1990,
-    `1992` = sgdat1992,
-    `1994` = sgdat1994,
-    `1996` = sgdat1996,
-    `1999` = sgdat1999,
-    `2001` = sgdat2001,
-    `2004` = sgdat2004,
-    `2006` = sgdat2006,
-    `2008` = sgdat2008,
-    `2010` = sgdat2010,
-    `2012` = sgdat2012,
-    `2014` = sgdat2014,
-    `2016` = sgdat2016,
-    `2018` = sgdat2018, 
-    `2020` = sgdat2020, 
-    `2022` = sgdat2022,
-    `2024` = sgdat2024
-  ) %>%
-  enframe('yr', 'data') %>%
-  mutate(
-    data = purrr::map(data, function(x){
+# years with full seagrass layers in data/, sorted chronologically
+# layers are not loaded here, only when needed by getsg() in R/funcs.R
+yrs <- list.files('data', '^sgdat[0-9]{4}[.]RData$') %>%
+  gsub('^sgdat|[.]RData$', '', .)
 
-      x <- x %>%
-        mutate(
-          FLUCCSCODE = factor(FLUCCSCODE, levels = flcat$code, labels = flcat$name)
-        ) %>%
-        select(Category = FLUCCSCODE)
-
-
-      st_crs(x) <- prj
-
-      return(x)
-
-    })
-  )
+# cache for loaded seagrass layers, kept in the global environment so it is
+# shared by all sessions in the same R process
+if(!exists('sgcache', envir = globalenv()))
+  assign('sgcache', new.env(), envir = globalenv())
+sgcache <- get('sgcache', envir = globalenv())
 
 # cols <- c('tan', 'darkgreen', 'green', 'brown')
 cols <- c('#D2B48C', '#006400', '#00FF00', '#A52A2A')
@@ -122,47 +76,6 @@ names(cols) <- c('sand', 'cont.', 'patchy', 'algae')
 ```
 
 ```{r reactives}
-# filter all seagrass data by fluccs code
-fltallsg <- reactive({
-
-  # input
-  flsel <- c(input$flsel, 'other')
-
-  out <- allsg %>%
-    mutate(
-      data = purrr::map(data, function(x){
-
-        x %>%
-          filter(Category %in% flsel) %>%
-          mutate(Category = fct_drop(Category))
-
-      })
-    )
-
-  return(out)
-
-})
-
-# year to plot
-sgdat <- reactive({
-
-  # input
-  yrsel <- input$yrsel
-  fltallsg <- fltallsg()
-
-  out <- fltallsg %>%
-    filter(yr %in% yrsel) %>%
-    pull(data) %>%
-    .[[1]]
-
-  validate(
-    need(nrow(out) > 0, 'No selection')
-  )
-
-  return(out)
-
-})
-
 # overview map, shows only simplified polygons
 allmap <- reactive({
 
@@ -297,7 +210,7 @@ txtsel <- reactive({
 crpsel <- reactive({
 
   # input
-  fltallsg <- fltallsg()
+  flsel <- c(input$flsel, 'other')
   edits <- edits()()
 
   # requires edits to continue
@@ -332,12 +245,13 @@ crpsel <- reactive({
       need(chkarea > 1, paste0('Selected size is ', chkarea, ' acres and must be greater than 1 acre, please select a larger area'))
     )
   
-    # crop and summarize by year
-    out <- fltallsg %>%
+    # crop and summarize by year, requires all years
+    out <- getallsg(yrs, flsel, sgcache, flcat, prj) %>%
       mutate(
         data = purrr::map(data, function(x){
-  
-          x <- st_intersection(tocrp, x) %>%
+
+          # subset to polygons touching the selection first, much faster intersection
+          x <- st_intersection(tocrp, x[tocrp, ]) %>%
             mutate(
               area = st_area(.)
             ) 
@@ -567,7 +481,6 @@ cmpsel <- reactive({
   
   # input
   crpsel <- crpsel()
-  fltallsg <- fltallsg()
   flsel <- c(input$flsel, 'other')
   yrcmp1 <- input$yrcmp1
   yrcmp2 <- input$yrcmp2
@@ -589,13 +502,12 @@ cmpsel <- reactive({
     
     toflt <- tbseg[tocrp, ]
     
-    # crop and summarize by year
-    out <- fltallsg %>%
-      filter(yr %in% c(yrcmp1, yrcmp2)) %>% 
+    # crop and summarize by year, only the two comparison years are loaded
+    out <- getallsg(yrs[yrs %in% c(yrcmp1, yrcmp2)], flsel, sgcache, flcat, prj) %>%
       mutate(
         data = purrr::map(data, function(x){
-  
-          x <- x[tbseg, ] %>%
+
+          x <- x[toflt, ] %>%
             mutate(
               area = st_area(.)
             ) 
@@ -728,7 +640,7 @@ Column {.tabset .tabset-fade}
 ```{r}
 column(12,
   br(),
-  column(4, selectInput('yrsel', 'Select year on map:', choices = allsg$yr, selected = '2024')),
+  column(4, selectInput('yrsel', 'Select year on map:', choices = yrs, selected = '2024')),
   column(4, selectInput('flsel', 'Select categories:', choices = c(flcat$name), selected = c(flcat$name), multiple = T)),
   column(4, renderText(txtsel()))
 )
@@ -812,8 +724,8 @@ output$cmpselrcttab <- renderReactable(cmpselrcttab())
 fillCol(flex = c(NA, 1),
   column(12, 
     column(4, selectInput('segres3', 'Choose summary output:', choices = c('plot', 'table'))),
-    column(4, selectInput('yrcmp1', 'Choose first year:', choices = allsg$yr, selected = '2022')),
-    column(4, selectInput('yrcmp2', 'Choose second year:', choices = allsg$yr, selected = '2024'))
+    column(4, selectInput('yrcmp1', 'Choose first year:', choices = yrs, selected = '2022')),
+    column(4, selectInput('yrcmp2', 'Choose second year:', choices = yrs, selected = '2024'))
   ),
   renderUI({
     

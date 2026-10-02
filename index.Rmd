@@ -6,7 +6,7 @@ output:
      social: menu
      source_code: "https://github.com/tbep-tech/seagrass-dash"
      includes:
-       in_header: cssloaders_in_header.html
+       in_header: [cssloaders_in_header.html, computing_in_header.html]
 runtime: shiny
 css: styles.css
 ---

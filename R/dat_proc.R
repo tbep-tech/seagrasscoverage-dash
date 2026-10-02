@@ -1,7 +1,6 @@
 library(tidyverse)
 library(sf)
 library(tbeptools)
-library(mapview)
 library(doParallel)
 library(foreach)
 library(units)

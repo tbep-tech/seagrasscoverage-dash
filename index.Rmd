@@ -17,9 +17,9 @@ knitr::opts_chunk$set(echo = F, message = F, warning = F)
 library(flexdashboard)
 library(tidyverse)
 library(mapedit)
+library(leaflet)
 library(leaflet.extras)
 library(sf)
-library(mapview)
 library(reactable)
 library(shinydashboard)
 library(shinyWidgets)
@@ -182,8 +182,27 @@ allmap <- reactive({
   # fix colors based on selection
   colreg <- cols[levels(tomap$Category)]
 
-  out <- mapview(tomap, homebutton = F, zcol = 'Category', layer.name = 'Category', col.regions = colreg, color = 'grey', lwd = 0) %>% 
-    .@map %>% 
+  pal <- colorFactor(palette = unname(colreg), levels = names(colreg))
+
+  # bay segments go in a pane below the default overlay pane (zIndex 400)
+  # so seagrass polygons are on top and receive hover events
+  out <- leaflet() %>%
+    addProviderTiles(providers$Esri.WorldGrayCanvas) %>%
+    addMapPane('segments', zIndex = 390) %>%
+    addPolygons(
+      data = tomap,
+      stroke = F,
+      fillColor = ~pal(Category),
+      fillOpacity = 0.6,
+      label = ~as.character(Category)
+    ) %>%
+    addLegend(
+      position = 'topright',
+      colors = unname(colreg),
+      labels = names(colreg),
+      title = 'Category',
+      opacity = 0.6
+    ) %>%
     addPolygons(
       data = tbseg, 
       stroke = T, 
@@ -192,8 +211,9 @@ allmap <- reactive({
       layerId = ~long_name, 
       fillColor = ~long_name, 
       fillOpacity = 0,
-      label = ~paste0(bay_segment, ': ', long_name)
-    ) %>% 
+      label = ~paste0(bay_segment, ': ', long_name),
+      options = pathOptions(pane = 'segments')
+    ) %>%
     addPolylines(
       data = trnlns,
       stroke = T,
